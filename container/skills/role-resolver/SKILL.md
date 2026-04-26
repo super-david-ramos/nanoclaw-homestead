@@ -1,0 +1,96 @@
+---
+name: role-resolver
+description: Apply the household skill-resolution convention. Whenever multiple skills with the same name exist across the user / role / shared trees inside this group's skills folder, choose exactly one using first-match priority — user-specific over role-specific over shared. Activates whenever the agent is about to use any skill that has duplicate definitions across these trees, or when the agent loads its skill set at the start of a turn.
+---
+
+# Role Resolver — household skill priority
+
+This skill encodes the household convention for picking which version of a duplicately-named skill to run. It exists because this group has skills organized into three priority tiers, and the Claude Agent SDK by itself doesn't know which one wins.
+
+## When this matters
+
+It applies whenever a skill name (the `name:` frontmatter value, not the file path) appears in **more than one** of these locations inside the group's working tree:
+
+- `/workspace/group/skills/users/<user_id>/<skill>/SKILL.md` — user-scoped (highest priority)
+- `/workspace/group/skills/roles/<role>/<skill>/SKILL.md` — role-scoped (middle)
+- `/workspace/group/skills/shared/<skill>/SKILL.md` — household default (lowest)
+
+If a skill name appears in only one location, there's no ambiguity and you can ignore this skill — the standard SDK resolution is correct.
+
+## The rule
+
+**First match wins. No merging.** When the same skill name lives in multiple tiers, pick *one* and treat the others as if they don't exist for this turn.
+
+Priority order:
+
+1. The current sender's user-specific skill (`users/<sender_user_id>/<name>/`)
+2. The current sender's role's skill (`roles/<sender_role>/<name>/`)
+3. The shared skill (`shared/<name>/`)
+
+The "current sender" is the user who sent the message you're about to respond to — the `from=` value in the inbound message envelope, not whoever first opened the conversation.
+
+## Where to read sender + role
+
+Each turn, the system prompt includes (or the inbound message metadata carries) two pieces of information you need:
+
+- `sender_user_id` — e.g., `telegram:123456789`. Maps to the directory name under `skills/users/`.
+- `sender_role` — one of `owner`, `admin`, `member`, `child`, `guest`. Maps to the directory name under `skills/roles/`.
+
+If either is missing for a given turn, fall back to `shared/` only — never silently activate a higher-priority skill without confirmed identity.
+
+## What "no merging" means concretely
+
+If `users/telegram:123/email-drafter/SKILL.md` exists, **only** that file's instructions apply. You do **not**:
+
+- Combine instructions from multiple tiers
+- Pull supporting scripts from a lower tier into a higher-tier skill
+- Inherit allowed-tools from a lower tier — the higher-tier SKILL.md's frontmatter is the complete spec
+
+If a lower-tier version has a script the higher tier needs, the higher tier should explicitly include or reference it.
+
+## Worked example
+
+Layout:
+
+```
+/workspace/group/skills/
+  shared/
+    morning-brief/SKILL.md          # generic briefing
+    email-drafter/SKILL.md          # default email tone
+  roles/
+    child/
+      morning-brief/SKILL.md        # kid-safe briefing
+  users/
+    telegram:david/
+      email-drafter/SKILL.md        # David's preferred email style
+```
+
+For a message from `telegram:david` (role `owner`):
+- `morning-brief`: only `shared/morning-brief/` exists for this user → use it (no priority conflict).
+- `email-drafter`: `users/telegram:david/` exists → use it. Ignore `shared/email-drafter/`.
+
+For a message from `telegram:owen` (role `child`):
+- `morning-brief`: `roles/child/morning-brief/` exists → use it. Ignore `shared/morning-brief/`.
+- `email-drafter`: only `shared/email-drafter/` exists → use it. (But other gates may prevent the child role from invoking email tools at all — that's a separate concern, not this skill's responsibility.)
+
+## What this skill does NOT do
+
+- It does **not** enforce role-based access control. If a child-role user invokes a skill they shouldn't have access to, that's a job for an upstream gate (approvals, content filter, future OPA layer) — not this skill.
+- It does **not** filter the visible skill list. All three trees stay mounted; you just pick which one to *activate* when names collide.
+- It does **not** modify or compose skills. Treat each SKILL.md as the complete spec for its tier.
+
+## Failure modes to avoid
+
+- **Activating a higher-tier skill without confirming identity.** If sender_user_id or sender_role is missing from the system context, drop to `shared/` rather than guessing.
+- **Cross-tier composition.** If you find yourself reading two SKILL.md files and combining their instructions, stop — that's the bug.
+- **Silently picking a tier when the user expected another.** If the priority resolution surprises a user (they wanted shared but got user-specific), say so explicitly: "Using your personalized email-drafter (under your user folder) — let me know if you want the household default instead."
+
+## Authoring new skills under this convention
+
+When adding a new skill to this group:
+
+- If it's universally applicable: put it in `shared/`.
+- If it's role-specific (e.g., kid-safe variant): put it in `roles/<role>/`.
+- If it's per-user (e.g., personal email signature): put it in `users/<user_id>/`.
+
+Skill names should match across tiers when you intend the priority rule to apply. Different names create independent skills with no priority interaction.

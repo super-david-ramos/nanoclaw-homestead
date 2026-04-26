@@ -245,3 +245,41 @@ launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
 ```
 
 `container/build.sh` reads `INSTALL_CJK_FONTS` from `.env` and passes it through as a Docker build-arg. Without CJK fonts, Chromium-rendered screenshots and PDFs containing CJK text show tofu (empty rectangles) instead of characters.
+
+---
+
+# Project: nanoclaw-homestead extensions
+
+This fork extends nanoclaw v2 with **multi-user household-agent capabilities** ported from [super-david-ramos/homestead-ts](https://github.com/super-david-ramos/homestead-ts). The household uses chat channels (Telegram, iMessage, etc.), supports voice in/out on every channel, persists memory in markdown the household can browse via Obsidian, and runs on a Mac Mini M2 (8 GB RAM).
+
+## Plan & tasking — read before coding
+
+The plan is the source of truth for what to build and in what order. **Don't write code from this CLAUDE.md alone — open the plan and find the active task.**
+
+| What you need | Where it lives |
+|---|---|
+| Plan entry point + reading order | [docs/plan/README.md](docs/plan/README.md) |
+| Working norms (TDD, integration tests, demo scripts, completion reports) | [docs/plan/conventions.md](docs/plan/conventions.md) |
+| The six load-bearing decisions | [docs/plan/02-decisions.md](docs/plan/02-decisions.md) and [docs/plan/decisions/](docs/plan/decisions/) |
+| Active phase + task list | [docs/plan/phases/](docs/plan/phases/) — start with `phase-0-foundations.md` |
+| Open design questions | [docs/plan/06-open-questions.md](docs/plan/06-open-questions.md) |
+
+## Working pattern
+
+When picking up work in this repo:
+
+1. **Find the active task.** Open the relevant phase doc under `docs/plan/phases/`. Pick the next pending task. If the task list is sparse, write it out *before* coding.
+2. **Apply TDD strictly.** Per [conventions.md](docs/plan/conventions.md): red commit → green commit → done. Never commit code without a test, never write a test that passes on first run unless you've proven it checks the new behavior.
+3. **Prefer integration tests where available.** The host ↔ container boundary (mediated by `inbound.db` / `outbound.db`) catches issues unit tests can't. Add integration scaffolding once and reuse.
+4. **Demo at major task boundaries.** Ship a runnable demo script under `tests/demo/<phase>/<feature>/` (`README.md` + `run.sh` + `expected.md`).
+5. **File a completion report.** At the end of each major task or set, fill the template from [conventions.md](docs/plan/conventions.md) §"Completion reports": what was done, test coverage (with honest gaps), demo coverage, manual validation steps for the user.
+6. **Mark tasks done in the phase doc** with a link to the report.
+
+## When upstream conventions conflict with this fork's
+
+Upstream wins. Surface the conflict in the completion report's "Manual validation" section so the user can decide whether to update upstream or update the fork's convention. Never silently override.
+
+## Existing project-specific artifacts
+
+- `container/skills/role-resolver/SKILL.md` — convention skill for user > role > shared priority. See [docs/plan/decisions/01-skill-resolution.md](docs/plan/decisions/01-skill-resolution.md).
+- `container/skills/auto-skill-save/SKILL.md` — propose-and-confirm skill writer (post-complex-turn, with approval gate). See [docs/plan/decisions/05-self-improving.md](docs/plan/decisions/05-self-improving.md).

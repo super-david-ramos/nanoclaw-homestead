@@ -1,0 +1,107 @@
+---
+name: auto-skill-save
+description: After a complex turn (5+ tool calls) or when the user asks to save the current approach, evaluate whether the workflow is genuinely reusable, propose a SKILL.md, and write it to the right tier of the group's skills folder — but only after explicit user approval via ask_user_question. Activates at end-of-turn when the eligibility check passes, OR when the user says any of "save this as a skill", "remember how to do this", "add this to your skills", "make this a skill".
+---
+
+# Auto Skill Save — propose new skills, never write silently
+
+This skill turns reusable approaches into durable skills under `groups/<group>/skills/`. It is opt-in per turn and gated by an explicit approval prompt — the agent never writes a SKILL.md without the user clicking "approve."
+
+## When to consider running
+
+End-of-turn eligibility check. **All** of these must be true:
+
+1. The turn used **≥ 5 tool calls** OR the user explicitly asked you to save the approach.
+2. The work was **not** a one-shot question, a debug session that won't recur, or a request that depends on volatile state (specific URLs, dates, in-flight bug numbers).
+3. The work has a **named outcome** you could re-invoke ("draft a weekly summary email", "rebuild the spice-rack inventory note") rather than a free-form chat.
+4. There isn't already an existing skill in this group's `skills/` tree that does the same job. Check first; if there is, prefer `patch_skill` (below) over creating a duplicate.
+
+If any of those fail, **skip** — do not propose a skill. Don't ask the user about it either; silence is the right move when nothing reusable happened.
+
+## What NOT to save
+
+- **Anything from a non-adult role.** If `sender_role` is `child` or `guest`, do not run this skill. The role-resolver should already keep child/guest groups out of this skill's scope, but defense in depth — bail before the eligibility check.
+- **Personal credentials, tokens, or one-time passwords** that appeared in the turn. If the workflow's reusability *depends* on a secret being present, the skill should reference how to retrieve the secret (e.g., "look up the API key in the vault entry named X"), never embed it.
+- **One-off debugging.** If you fixed a bug by reading three files and editing one line, the fix lives in git history, not as a skill.
+- **Anything that's already a built-in tool or a default capability.** Don't write a skill that says "use `agent-browser` to open URLs" — that's already in `agent-browser`.
+
+## The propose-and-confirm flow
+
+1. **Draft the SKILL.md in memory.** Do not write to disk yet. Use the format in the next section.
+2. **Pick a target tier.** Default to `shared` (applies to everyone in the group). Bump to `roles/<role>/` if the workflow is role-specific (e.g., owner-only operations). Bump to `users/<sender_user_id>/` only if the user explicitly says "this is for me, not the household."
+3. **Confirm with `ask_user_question`.** Show a card-or-question with the proposed skill name, target path, and a one-paragraph summary of what it does. Options:
+   - `Save it` — write the file
+   - `Edit first` — show full proposed body, take a free-text edit, then re-confirm
+   - `Save under different scope` — re-prompt for tier (shared / role / user)
+   - `Skip` — drop the proposal, do not nag
+4. **On approval, write the file.** Path: `/workspace/group/skills/<tier>/<skill-name>/SKILL.md`. Create the parent directories if missing. Use kebab-case for the skill name.
+5. **Confirm landing in chat.** One-line message: `Saved skill <name> under <tier>. You can run it next time by saying "<trigger phrase from the description>".`
+
+If the user picks `Skip`, do not save anything and do not surface the same proposal again in this session.
+
+## SKILL.md format we generate
+
+Match the agentskills.io / Claude Code format that the rest of this repo uses. Frontmatter plus prose — no YAML extras unless we know we need them.
+
+```
+---
+name: <kebab-case-name>
+description: <one paragraph that includes both what the skill does AND when to activate it. The description is what makes the skill discoverable by future agent turns — be specific about activation phrases.>
+---
+
+# <Title Case Name>
+
+## When to use
+
+When the user asks <X>, <Y>, or <Z>.
+
+## Procedure
+
+1. Step one — what tool, what args, what we expect back.
+2. Step two — branching based on step one's result.
+3. ...
+
+## Pitfalls
+
+- Common mistake we already learned to avoid.
+- Edge case that breaks the happy path.
+
+## Verification
+
+How to know the skill worked. What to check. What to send back to the user.
+```
+
+Do not add Hermes-style `metadata.hermes.*` fields, version numbers, license, platforms, or `required_environment_variables` — they aren't read by anything in this stack and create maintenance churn.
+
+## Updating an existing skill (`patch` flow)
+
+If the eligibility check passes but a skill with a similar purpose already exists in the group:
+
+1. Read the existing SKILL.md.
+2. Diff what *this turn* learned against what's there. Likely additions: a new pitfall, an improved verification step, an edge-case branch in the procedure.
+3. Propose the *minimal patch* via `ask_user_question` showing only the diff, not the whole file.
+4. On approval, apply the patch with `Edit` on the target SKILL.md.
+
+Never rewrite a skill from scratch when a focused patch will do.
+
+## Failure modes to avoid
+
+- **Saving a turn that wasn't actually reusable** because it had a lot of tool calls. Tool count is a *necessary* but not *sufficient* condition. The eligibility check's #2 and #3 do the real filtering.
+- **Saving a skill the user didn't ask for and won't ever use** ("auto-summarize this thread"). Bias toward not saving.
+- **Writing a skill that depends on one-off context** (a specific PR number, a specific calendar event). Generalize the procedure or skip.
+- **Saving without `ask_user_question` confirmation.** Even if the user said "save this as a skill" earlier in the turn, ask before writing — they may want to edit the description or change the tier.
+- **Creating a `users/<id>/` skill by default.** Default is `shared`. Only go user-scoped on explicit request — otherwise you're fragmenting the household's skill set without consent.
+
+## How this interacts with `role-resolver`
+
+This skill **writes** into the same three-tier layout (`shared / roles/<role> / users/<id>`) that `role-resolver` *reads*. So when this skill saves a new file, the resolver will pick it up on the next turn following the priority rule.
+
+If the proposed skill name already exists at a *higher* tier than the one we're about to write to, warn the user before saving:
+
+> Heads up — there's already a `<name>` skill under `roles/owner/`, which would still take priority over the `shared/` version we're about to save. Save anyway, or want to overwrite the role-scoped one instead?
+
+This prevents the silent-shadow surprise where someone saves a `shared` skill and wonders why it never activates.
+
+## Where this skill itself lives
+
+This SKILL.md ships as a container skill (under `container/skills/auto-skill-save/`), so it's available in **every** session container regardless of which agent group is running. The eligibility check (sender_role ≠ child/guest) is what scopes it to adult groups at runtime — the file itself is shared infrastructure.
