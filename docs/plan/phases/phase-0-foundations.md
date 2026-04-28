@@ -115,8 +115,9 @@ Contents:
 - [x] T-0.4 role-resolver SKILL.md (done)
 - [ ] T-0.4-tests landed
 - [x] T-0.5 auto-skill-save SKILL.md (done)
-- [ ] T-0.5-tests landed
-- [ ] T-0.6 family agent group bootstrap (code + setup)
+- [x] T-0.4-tests landed (see [Reports — T-0.4-tests + T-0.5-tests](#report-t-04-tests--t-05-tests-2026-04-28))
+- [x] T-0.5-tests landed (same report)
+- [ ] T-0.6 family agent group bootstrap — code piece **done** (see [Reports — T-0.6 code](#report-t-06-code--family-bootstrap-helper-2026-04-28)); DB-side wiring still owed
 - [ ] T-0.7 Obsidian vault verified (manual)
 - [ ] Demo at `tests/demo/phase-0/family-roundtrip/` runs green
 - [ ] Completion report below filled in
@@ -124,3 +125,61 @@ Contents:
 ## Reports
 
 <!-- Append per [conventions.md](../conventions.md) completion-report template when each major task closes. -->
+
+### Report: T-0.4-tests + T-0.5-tests {#report-t-04-tests--t-05-tests-2026-04-28}
+
+**Closed:** 2026-04-28
+
+#### What was done
+
+- Added `container/skills/role-resolver/tests/structure.test.ts` and `container/skills/auto-skill-save/tests/structure.test.ts` — frontmatter parse, required-section-header, and snapshot assertions per the plan.
+- Snapshots checked in under each skill's `tests/__snapshots__/`.
+- Updated `vitest.skills.config.ts` to glob `container/skills/**/tests/*.test.ts` (was only `.claude/skills/`).
+- Verified the assertions bite: temporarily mutated `## The rule` heading in `role-resolver/SKILL.md`; structural test and snapshot test both failed; restoring made them green.
+
+#### Test coverage
+
+- Files: `container/skills/role-resolver/tests/structure.test.ts`, `container/skills/auto-skill-save/tests/structure.test.ts`.
+- Scenarios covered: frontmatter declares the right `name`, `description` is non-empty (and for auto-skill-save references the 5+ tool-call threshold or the approval gate), all required section headers present, snapshot of full SKILL.md content matches.
+- Scenarios NOT covered: behavioral verification that an agent actually follows the skill at runtime — requires a live agent call, deferred per [conventions.md §"Markdown-only skills"](../conventions.md).
+- Coverage delta: not measured. The thing under test is markdown; we measure structural conformance.
+
+#### Demo
+
+- n/a — these tests gate structural correctness; the role-resolver and auto-skill-save behaviors will be exercised by the Phase-0 wrap demo (`tests/demo/phase-0/family-roundtrip/`, T-0.6 follow-up).
+
+#### Manual validation
+
+1. Run `pnpm exec vitest run --config vitest.skills.config.ts` — expect 8 passing across 2 files.
+2. Edit either SKILL.md (e.g., remove a section heading) and re-run; expect a snapshot + structural failure. Restore and re-run; expect green.
+
+### Report: T-0.6 code — family-bootstrap helper {#report-t-06-code--family-bootstrap-helper-2026-04-28}
+
+**Closed:** 2026-04-28 (code piece only — DB-side wiring still owed)
+
+#### What was done
+
+- Added `src/family-bootstrap.ts` exporting `bootstrapFamilyFolder(targetDir)` plus `FAMILY_PARA_FOLDERS` and `FAMILY_SKILL_TIERS` constants.
+- TDD red → green commits (red: 235cadf, green: 2bbdbd7).
+- Module is also CLI-runnable: `pnpm exec tsx src/family-bootstrap.ts <target-dir>`. Used to scaffold the local `groups/family/` tree.
+- Local-only (gitignored): scaffolded `groups/family/{projects,areas,resources,archive,conversations,skills/{users,roles,shared}}/` and copied `groups/dm-with-david/CLAUDE.local.md` (Barnaby persona) into `groups/family/CLAUDE.local.md`.
+
+#### Test coverage
+
+- Files: `src/family-bootstrap.test.ts`.
+- Scenarios covered: PARA folders created with `.gitkeep`; skills tier folders created with `.gitkeep`; idempotent (second call no-throws and preserves user-authored files); creates target dir if missing.
+- Scenarios NOT covered: nothing under the function's contract is uncovered. The DB-side registration of the `family` agent group is a separate task and not tested here.
+- Coverage delta: not measured.
+
+#### Demo
+
+- The Phase-0 wrap demo (`tests/demo/phase-0/family-roundtrip/`) is still owed and depends on the DB-side wiring landing first.
+
+#### Manual validation
+
+1. `pnpm exec vitest run src/family-bootstrap.test.ts` — expect 4 passing.
+2. `ls -la groups/family/` — expect PARA folders + `skills/` + `CLAUDE.local.md`.
+3. **Still owed for full T-0.6 closure:**
+   - Register a `family` agent group in `data/v2.db` (e.g., via `/manage-channels` or a follow-up host script) with `assistantName=Barnaby` so it shares the persona of `dm-with-david`.
+   - Wire it to a Telegram messaging group (likely a family group chat distinct from your DM).
+   - Once wired, send a message and confirm a response arrives, then build the Phase-0 wrap demo against this group.
