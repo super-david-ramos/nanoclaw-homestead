@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['.claude/skills/**/tests/*.test.ts'],
+    include: [
+      'container/skills/**/tests/*.test.ts',
+      '.claude/skills/**/tests/*.test.ts',
+    ],
   },
 });
