@@ -349,8 +349,15 @@ function evaluateEngage(
       if (pat === '.') return true;
       try {
         return new RegExp(pat).test(text);
-      } catch {
-        // Bad regex: fail open so admin sees the agent responding + can fix.
+      } catch (err) {
+        // Fail open so admin sees the agent responding + can fix; also log
+        // so the cause is visible in nanoclaw.error.log instead of having
+        // to re-derive it from chat behavior.
+        log.warn('engage_pattern failed to compile — failing open', {
+          messaging_group_agent_id: agent.id,
+          engage_pattern: pat,
+          err,
+        });
         return true;
       }
     }

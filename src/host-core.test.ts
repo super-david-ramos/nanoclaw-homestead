@@ -507,9 +507,7 @@ describe('router engage_pattern', () => {
       expect(wakeContainer).toHaveBeenCalledTimes(1);
 
       // The fix: a warn log identifying which wiring + pattern is broken.
-      const matching = warnSpy.mock.calls.filter(([msg]) =>
-        /engage_pattern|regex|pattern.*compile/i.test(String(msg)),
-      );
+      const matching = warnSpy.mock.calls.filter(([msg]) => /engage_pattern|regex|pattern.*compile/i.test(String(msg)));
       expect(matching.length).toBeGreaterThan(0);
       const data = matching[0][1] as Record<string, unknown> | undefined;
       expect(data).toBeDefined();
