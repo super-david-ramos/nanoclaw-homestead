@@ -415,6 +415,112 @@ describe('router', () => {
   });
 });
 
+describe('router engage_pattern', () => {
+  beforeEach(() => {
+    createAgentGroup({
+      id: 'ag-1',
+      name: 'Test Agent',
+      folder: 'test-agent',
+      agent_provider: null,
+      created_at: now(),
+    });
+    createMessagingGroup({
+      id: 'mg-1',
+      channel_type: 'discord',
+      platform_id: 'chan-123',
+      name: 'General',
+      is_group: 1,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+  });
+
+  function wireAgentWithPattern(pattern: string): void {
+    createMessagingGroupAgent({
+      id: 'mga-1',
+      messaging_group_id: 'mg-1',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: pattern,
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+  }
+
+  function inboundEvent(text: string, id = 'msg-engage-test'): InboundEvent {
+    return {
+      channelType: 'discord',
+      platformId: 'chan-123',
+      threadId: null,
+      message: {
+        id,
+        kind: 'chat',
+        content: JSON.stringify({ sender: 'User', text }),
+        timestamp: now(),
+      },
+    };
+  }
+
+  it('engages when a valid non-sentinel pattern matches the message text', async () => {
+    wireAgentWithPattern('\\b[Bb]arnaby\\b');
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound(inboundEvent('hi Barnaby, what time is it?'));
+
+    expect(wakeContainer).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not engage when a valid non-sentinel pattern does not match', async () => {
+    wireAgentWithPattern('\\b[Bb]arnaby\\b');
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound(inboundEvent('hi'));
+
+    expect(wakeContainer).not.toHaveBeenCalled();
+    expect(findSession('mg-1', null)).toBeUndefined();
+  });
+
+  it('preserves fail-open AND emits a warn log when engage_pattern is malformed', async () => {
+    // Regression: `(?i)` is not valid in JS RegExp without a flag arg, so
+    // `new RegExp(pat)` throws. The router intentionally fails open so the
+    // admin sees the bot responding to everything and fixes the pattern,
+    // but it must ALSO log a warning so the cause is debuggable without
+    // having to re-derive the silent compile failure from chat behavior.
+    wireAgentWithPattern('(?i)\\bbarnaby\\b');
+    const { log } = await import('./log.js');
+    const warnSpy = vi.spyOn(log, 'warn').mockImplementation(() => undefined);
+    try {
+      const { routeInbound } = await import('./router.js');
+      const { wakeContainer } = await import('./container-runner.js');
+      (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+      await routeInbound(inboundEvent('hi'));
+
+      // Fail-open intent preserved: agent still engages on unmatched text.
+      expect(wakeContainer).toHaveBeenCalledTimes(1);
+
+      // The fix: a warn log identifying which wiring + pattern is broken.
+      const matching = warnSpy.mock.calls.filter(([msg]) =>
+        /engage_pattern|regex|pattern.*compile/i.test(String(msg)),
+      );
+      expect(matching.length).toBeGreaterThan(0);
+      const data = matching[0][1] as Record<string, unknown> | undefined;
+      expect(data).toBeDefined();
+      expect(data?.engage_pattern).toBe('(?i)\\bbarnaby\\b');
+      expect(data?.messaging_group_agent_id).toBe('mga-1');
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
 describe('delivery', () => {
   it('should detect undelivered messages in outbound DB', () => {
     createAgentGroup({
