@@ -6,6 +6,9 @@ node_modules/
 # Build output
 dist/
 
+# Test coverage reports
+coverage/
+
 # Local data & auth
 store/
 data/
