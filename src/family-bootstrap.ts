@@ -1,13 +1,7 @@
 import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const FAMILY_PARA_FOLDERS = [
-  'projects',
-  'areas',
-  'resources',
-  'archive',
-  'conversations',
-] as const;
+export const FAMILY_PARA_FOLDERS = ['projects', 'areas', 'resources', 'archive', 'conversations'] as const;
 
 export const FAMILY_SKILL_TIERS = ['users', 'roles', 'shared'] as const;
 
@@ -32,9 +26,7 @@ export function bootstrapFamilyFolder(targetDir: string): void {
 }
 
 const invokedAsScript =
-  typeof process !== 'undefined' &&
-  process.argv[1] &&
-  import.meta.url === `file://${process.argv[1]}`;
+  typeof process !== 'undefined' && process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 
 if (invokedAsScript) {
   const target = process.argv[2];
