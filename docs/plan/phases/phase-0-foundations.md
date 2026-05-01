@@ -111,16 +111,15 @@ Contents:
 
 - [ ] T-0.1 setup complete (manual)
 - [x] T-0.2 upstream remote (done)
-- [ ] T-0.3 Telegram installed (manual)
+- [x] T-0.3 Telegram installed (verified by live roundtrip — see T-0.6 close)
 - [x] T-0.4 role-resolver SKILL.md (done)
-- [ ] T-0.4-tests landed
 - [x] T-0.5 auto-skill-save SKILL.md (done)
 - [x] T-0.4-tests landed (see [Reports — T-0.4-tests + T-0.5-tests](#report-t-04-tests--t-05-tests-2026-04-28))
 - [x] T-0.5-tests landed (same report)
-- [ ] T-0.6 family agent group bootstrap — code piece **done** (see [Reports — T-0.6 code](#report-t-06-code--family-bootstrap-helper-2026-04-28)); DB-side wiring still owed
+- [x] T-0.6 family agent group bootstrap — code piece (see [Reports — T-0.6 code](#report-t-06-code--family-bootstrap-helper-2026-04-28)) AND DB-side wiring (see [Reports — T-0.6 close](#report-t-06-close--db-wiring--phase-0-wrap-2026-05-01))
 - [ ] T-0.7 Obsidian vault verified (manual)
-- [ ] Demo at `tests/demo/phase-0/family-roundtrip/` runs green
-- [ ] Completion report below filled in
+- [x] Demo at `tests/demo/phase-0/family-roundtrip/` runs green
+- [x] Completion report below filled in
 
 ## Reports
 
@@ -183,3 +182,40 @@ Contents:
    - Register a `family` agent group in `data/v2.db` (e.g., via `/manage-channels` or a follow-up host script) with `assistantName=Barnaby` so it shares the persona of `dm-with-david`.
    - Wire it to a Telegram messaging group (likely a family group chat distinct from your DM).
    - Once wired, send a message and confirm a response arrives, then build the Phase-0 wrap demo against this group.
+
+   **Closed in [Report — T-0.6 close](#report-t-06-close--db-wiring--phase-0-wrap-2026-05-01).**
+
+### Report: T-0.6 close — DB wiring + Phase-0 wrap {#report-t-06-close--db-wiring--phase-0-wrap-2026-05-01}
+
+**Closed:** 2026-05-01
+
+#### What was done
+
+- **DB-side helper.** Added `src/family-agent-bootstrap.ts` exporting `ensureFamilyAgent(opts)` — idempotent registration of the `family` agent group + a Telegram messaging group + a `messaging_group_agents` wiring. Defaults: `name='Barnaby'`, `folder='family'`, `engage_mode='mention'`. TDD red→green: 9654388 → 7a89885.
+- **Thin script wrapper.** Added `scripts/init-family-agent.ts` (commit a167315) — calls `bootstrapFamilyFolder` for the on-disk PARA + skills layout, `ensureFamilyAgent` for DB rows, then `initGroupFilesystem` for `CLAUDE.local.md` + `container.json` + `.claude-shared/`. CLI args: `--telegram-chat-id`, `--agent-name`, `--folder`, `--group-name`, `--engage-mode`, `--engage-pattern`.
+- **Live wiring.** Ran the script against `data/v2.db` for the Telegram chat ID `-4996058079` (named "Homestead Chat"). Wiring set to `engage_mode='pattern'` with case-insensitive whole-word `barnaby` matcher: `\b[Bb][Aa][Rr][Nn][Aa][Bb][Yy]\b`. Cleaned up two side effects: a stale `messaging_group_agents` row from a prior channel-registration approval that pointed the family chat at the `dm-with-david` agent, and its matching `agent_destinations` row.
+- **Bug found and fixed during this work.** The first pattern attempted (`(?i)\bbarnaby\b`) does not compile under JS `RegExp` (no `i` flag passed). The router's catch in `evaluateEngage` "failed open" silently — the bot responded to every message including "hi". Per the bug-handling workflow (`feedback_bug_handling.md` memory): located the existing test gap (no test exercised any non-`.` pattern, valid or invalid), added 3 new router engage tests including a regression test for the malformed-pattern path (commit 5f43925), then a minimal fix that emits `log.warn` while preserving the fail-open intent (commit a6d9160).
+- **Coverage tooling.** Wired `@vitest/coverage-v8@4.1.4` + `pnpm test:coverage` (commit 49eced0). Baseline: ~19% statements, ~17% branches, ~27% functions across `src/`. `coverage/` is gitignored.
+- **Demo.** `tests/demo/phase-0/family-roundtrip/` (commit 7628812) — `run.sh` + `README.md` + `expected.md`. Read-only inspection of live wiring, on-disk state, recent log activity, and per-session DB contents. Departure from the plan wording (which said "synthetic inbound row to inbound.db") is documented in the README's "Why this demo is read-only" section: a real synthetic injection against the live agent would either spam the family Telegram chat or duplicate the persona in an isolated env. Synthetic injection lives in `host-core.test.ts` integration tests instead.
+- **Persona update.** Edited `groups/family/CLAUDE.local.md` (gitignored) so Barnaby self-describes as "agent for David and his family" instead of "agent for David".
+
+#### Test coverage
+
+- Files: `src/family-agent-bootstrap.test.ts` (4 cases), `src/host-core.test.ts` (3 new `router engage_pattern` cases bringing the file to 16 tests).
+- Scenarios covered: family agent + messaging group + wiring created on first call; idempotent on re-call (same IDs, no duplicates); custom `agentName`/`folder`/`engageMode` honored; `FAMILY_DEFAULTS` exports the documented defaults; `engage_pattern` non-sentinel match → engages; non-sentinel no-match → does not engage; malformed pattern still engages (fail-open) AND emits `log.warn` with the wiring id and offending pattern.
+- Scenarios NOT covered: live container roundtrip in an automated test (covered in the host-core integration tests but not as a true container spawn — `wakeContainer` is mocked); `agent_destinations` row not auto-created or refreshed by `ensureFamilyAgent` (separate concern from `createMessagingGroupAgent` which is already tested upstream); behavioral test that the persona file is actually loaded by the spawned container.
+- Coverage delta: `src/router.ts` `evaluateEngage` went from 0 non-sentinel branch coverage to 100% of the `pattern` branches (match / no-match / malformed). Whole-file coverage on `router.ts` and the rest of `src/` remains low and is tracked in `docs/plan/follow-ups.md`.
+
+#### Demo
+
+- Path: `tests/demo/phase-0/family-roundtrip/run.sh`.
+- What it shows: service status, central DB wiring (agent group + messaging group + engage_mode/pattern), on-disk PARA + skills + persona scaffolding, the most recent `Message routed` log line for the family agent, the latest 3 inbound and 3 outbound rows from the family session DBs, and any agent-written notes under `groups/family/conversations/`.
+- How to run: `bash tests/demo/phase-0/family-roundtrip/run.sh` from the repo root. Idempotent and read-only.
+- Expected output: see [`expected.md`](../../../tests/demo/phase-0/family-roundtrip/expected.md). Exit code is 0 when wiring is in place AND a recent route succeeded; 1 if no recent route (likely no real Telegram message has been sent yet); 2 if preconditions fail.
+
+#### Manual validation
+
+1. **Confirm the bot still responds to wake-words.** In the wired Telegram group, send `hi` — the bot must stay silent. Send `hi barnaby` (any casing) — the bot must respond. If `hi` triggers the bot, the engage_pattern is broken or the wiring is duplicated; re-check `sqlite3 data/v2.db "SELECT engage_mode, engage_pattern FROM messaging_group_agents WHERE agent_group_id='ag-1777562667415-i2zjxy'"`.
+2. **Run the demo.** `bash tests/demo/phase-0/family-roundtrip/run.sh` should exit 0 with a green "✓ Phase-0 family roundtrip is live" summary.
+3. **Verify Obsidian renders the family vault.** Open `groups/family/` in Obsidian. PARA folders should show; `CLAUDE.local.md` should render cleanly. (This is the T-0.7 manual step, still owed.)
+4. **Conflict with upstream conventions.** None known. The demo uses a read-only inspection shape rather than the synthetic-inbound shape the plan originally suggested; this is documented in the demo README and in the "What was done" section above.
