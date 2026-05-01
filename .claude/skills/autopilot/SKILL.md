@@ -17,7 +17,7 @@ This skill is **not** a license to skip the project's working norms. It encodes 
 
 ## Order of operations
 
-1. **Call the advisor before any substantive work.** This is the single biggest leverage point. The advisor catches phantom-scope plans, premature parallelization, and unverified assumptions. One advisor call before "executing" saves multiple later.
+1. **Call the advisor before committing to a non-obvious approach on tasks longer than ~5 steps.** This is the single biggest leverage point at the right scope. The advisor catches phantom-scope plans, premature parallelization, and unverified assumptions. One advisor call before "executing" a multi-hour autopilot run saves multiple cleanups later. (For short, mechanical work — doc updates, single TDD pair, single-file edits — the advisor overhead isn't justified.)
 
 2. **Read the active phase doc FIRST.** Before planning the work, read `docs/plan/phases/<active>.md` start-to-finish. The plan's task list and "done when" criteria define scope. Without this read, you'll plan against an imagined phase.
 

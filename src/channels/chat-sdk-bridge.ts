@@ -161,12 +161,20 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // via local Whisper (host-side) and mutate the entry with a `transcript`
       // field. The collected transcripts also splice into the message text so
       // an agent that doesn't inspect the attachments array still gets the
-      // spoken content. Failure-tolerant: see attachVoiceTranscripts.
-      const transcripts = await attachVoiceTranscripts(enriched);
-      if (transcripts.length > 0) {
-        const existing = typeof serialized.text === 'string' ? serialized.text : '';
-        const voiceText = `[Voice: ${transcripts.join(' / ')}]`;
-        serialized.text = existing ? `${existing}\n\n${voiceText}` : voiceText;
+      // spoken content. Failure-tolerant inside the helper (per-attachment
+      // crashes warn + continue); the outer try/catch is a defense-in-depth
+      // against a bug in the helper itself — without it a code regression in
+      // attachVoiceTranscripts would crash messageToInbound and silently drop
+      // the entire message, not just the audio handling.
+      try {
+        const transcripts = await attachVoiceTranscripts(enriched);
+        if (transcripts.length > 0) {
+          const existing = typeof serialized.text === 'string' ? serialized.text : '';
+          const voiceText = `[Voice: ${transcripts.join(' / ')}]`;
+          serialized.text = existing ? `${existing}\n\n${voiceText}` : voiceText;
+        }
+      } catch (err) {
+        log.error('attachVoiceTranscripts crashed; continuing without transcripts', { err });
       }
 
       serialized.attachments = enriched;

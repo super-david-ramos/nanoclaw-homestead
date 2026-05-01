@@ -279,7 +279,12 @@ When picking up work in this repo:
 
 Upstream wins. Surface the conflict in the completion report's "Manual validation" section so the user can decide whether to update upstream or update the fork's convention. Never silently override.
 
+## When the user authorizes long autonomous work
+
+Phrases like "autopilot", "max effort", "work until I interrupt", "I'll be out, keep going" → invoke `/autopilot` first. The skill at `.claude/skills/autopilot/SKILL.md` codifies the working pattern that's safe under those constraints (TDD discipline + advisor checkpoints + scratch-before-live + commit-log-as-narrative + no pushes). Don't reinvent it each session.
+
 ## Existing project-specific artifacts
 
 - `container/skills/role-resolver/SKILL.md` — convention skill for user > role > shared priority. See [docs/plan/decisions/01-skill-resolution.md](docs/plan/decisions/01-skill-resolution.md).
 - `container/skills/auto-skill-save/SKILL.md` — propose-and-confirm skill writer (post-complex-turn, with approval gate). See [docs/plan/decisions/05-self-improving.md](docs/plan/decisions/05-self-improving.md).
+- `.claude/skills/autopilot/SKILL.md` — autonomous-mode working pattern (see above).

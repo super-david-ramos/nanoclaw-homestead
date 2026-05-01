@@ -148,3 +148,16 @@ Rationale:
 - **A `/voice-on` / `/voice-off` slash command or a self-mod tool** so users can flip their preference without a developer poking the DB.
 - **T-1.3 fork decision** — whether to maintain a `skill/voice-out` branch in upstream-style. Defer until the delivery wiring lands; no fork is useful without the wiring.
 - **Live cross-device STT integration test.** Once delivery wiring is in, send a voice note via the family Telegram group with a user who has `prefers_voice_replies=1` and confirm a voice reply arrives.
+
+#### Ordering constraint — restart the host before flipping any preference
+
+Migration 014 ships in this commit but only takes effect at the next service restart. STT inbound works regardless (the bridge integration doesn't read the new column). But: do **not** call `setUserPrefersVoice(...)` (or any future `/voice-on` command) before restarting the host — the column won't exist in the running DB connection and the helper will throw.
+
+Sequence to follow on first run after pulling Phase 1:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
+# systemctl --user restart nanoclaw                 # Linux
+```
+
+The Phase-1 demo's section 4 is the diagnostic — it flips from yellow `⚠ column missing` to green `✓ column present` after the restart.
