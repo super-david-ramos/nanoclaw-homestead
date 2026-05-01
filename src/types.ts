@@ -43,6 +43,8 @@ export interface User {
   kind: string; // 'phone' | 'email' | 'discord' | 'telegram' | 'matrix' | ...
   display_name: string | null;
   created_at: string;
+  /** SQLite INTEGER (0/1). Read with helpers in modules/permissions/db/users.ts. */
+  prefers_voice_replies?: number;
 }
 
 export type UserRoleKind = 'owner' | 'admin';

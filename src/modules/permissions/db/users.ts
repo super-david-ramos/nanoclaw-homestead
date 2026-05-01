@@ -36,3 +36,22 @@ export function updateDisplayName(id: string, displayName: string): void {
 export function deleteUser(id: string): void {
   getDb().prepare('DELETE FROM users WHERE id = ?').run(id);
 }
+
+/**
+ * Read the per-user voice-reply preference. Returns false for unknown
+ * users and for users where the column was never set — the default state
+ * is "no voice replies" so a brand-new install never surprises someone with
+ * an audio response.
+ */
+export function getUserPrefersVoice(id: string): boolean {
+  const row = getDb().prepare('SELECT prefers_voice_replies FROM users WHERE id = ?').get(id) as
+    | { prefers_voice_replies: number }
+    | undefined;
+  return row?.prefers_voice_replies === 1;
+}
+
+export function setUserPrefersVoice(id: string, prefers: boolean): void {
+  getDb()
+    .prepare('UPDATE users SET prefers_voice_replies = ? WHERE id = ?')
+    .run(prefers ? 1 : 0, id);
+}
