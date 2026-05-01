@@ -19,14 +19,14 @@ platform_id           name            is_group  engage_mode  engage_pattern
 telegram:-…           Homestead Chat  1         pattern      \b[Bb][Aa][Rr][Nn][Aa][Bb][Yy]\b
 
 === 3. On-disk state (groups/family/) ===
-  archive
-  areas
+  archive → …/iCloud~md~obsidian/Documents/Homestead/archive  [symlink]
+  areas → …/iCloud~md~obsidian/Documents/Homestead/areas  [symlink]
   CLAUDE.local.md
   CLAUDE.md
   container.json
-  conversations
-  projects
-  resources
+  conversations → …/iCloud~md~obsidian/Documents/Homestead/conversations  [symlink]
+  projects → …/iCloud~md~obsidian/Documents/Homestead/projects  [symlink]
+  resources → …/iCloud~md~obsidian/Documents/Homestead/resources  [symlink]
   skills
 ✓ persona at groups/family/CLAUDE.local.md
 ✓ skills/users/

@@ -6,9 +6,9 @@ Demonstrates the Phase-0 wrap deliverable from [`docs/plan/phases/phase-0-founda
 
 - The `family` agent group exists in the central DB with the expected name and folder.
 - It is wired to a Telegram messaging group (the family chat) with a wake-word pattern that does not engage on every message.
-- The on-disk PARA + skills + persona scaffolding under `groups/family/` is in place.
+- The on-disk PARA + skills + persona scaffolding under `groups/family/` is in place. PARA folders symlink out to the household's iCloud-synced Obsidian vault at `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Homestead/` (T-0.7 unification) — runtime files (`container.json`, `skills/`, `CLAUDE.local.md`) stay local; user-facing markdown (`projects/`, `areas/`, `resources/`, `archive/`, `conversations/`) is synced to iCloud and browsable from Obsidian Mobile.
 - A real Telegram → router → container → outbound roundtrip recently succeeded (recent log line + non-empty session DBs).
-- Any notes the agent has decided to write are visible in `groups/family/conversations/` (Obsidian vault root).
+- Any notes the agent has decided to write end up in the iCloud Homestead vault (via the symlinked `groups/family/conversations/`).
 
 ## Why this demo is read-only
 

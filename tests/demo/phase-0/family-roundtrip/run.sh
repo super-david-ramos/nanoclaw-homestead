@@ -91,8 +91,17 @@ if [[ ! -d "groups/$FAMILY_FOLDER" ]]; then
   red "✗ groups/$FAMILY_FOLDER/ missing"
   exit 1
 fi
-ls -1 "groups/$FAMILY_FOLDER" | while read -r entry; do
-  echo "  $entry"
+# Show entries with `[link]` annotation so the iCloud-symlink wiring is
+# visible to the operator at a glance — this is the T-0.7 unification that
+# routes agent-written PARA content into the household's Obsidian vault.
+for entry in "groups/$FAMILY_FOLDER"/*; do
+  base="$(basename "$entry")"
+  if [[ -L "$entry" ]]; then
+    target="$(readlink "$entry")"
+    echo "  $base → $target  [symlink]"
+  else
+    echo "  $base"
+  fi
 done
 
 if [[ ! -f "groups/$FAMILY_FOLDER/CLAUDE.local.md" ]]; then

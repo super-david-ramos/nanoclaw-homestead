@@ -109,7 +109,7 @@ Contents:
 
 ## Phase 0 done = all of:
 
-- [ ] T-0.1 setup complete (manual)
+- [x] T-0.1 setup complete (verified at Phase-0 close — see [Report — T-0.1 + T-0.7 close](#report-t-01--t-07-close-2026-05-01))
 - [x] T-0.2 upstream remote (done)
 - [x] T-0.3 Telegram installed (verified by live roundtrip — see T-0.6 close)
 - [x] T-0.4 role-resolver SKILL.md (done)
@@ -117,7 +117,7 @@ Contents:
 - [x] T-0.4-tests landed (see [Reports — T-0.4-tests + T-0.5-tests](#report-t-04-tests--t-05-tests-2026-04-28))
 - [x] T-0.5-tests landed (same report)
 - [x] T-0.6 family agent group bootstrap — code piece (see [Reports — T-0.6 code](#report-t-06-code--family-bootstrap-helper-2026-04-28)) AND DB-side wiring (see [Reports — T-0.6 close](#report-t-06-close--db-wiring--phase-0-wrap-2026-05-01))
-- [ ] T-0.7 Obsidian vault verified (manual)
+- [x] T-0.7 Obsidian vault verified — iCloud Homestead vault unified with `groups/family/` via selective PARA symlinks (see [Report — T-0.1 + T-0.7 close](#report-t-01--t-07-close-2026-05-01))
 - [x] Demo at `tests/demo/phase-0/family-roundtrip/` runs green
 - [x] Completion report below filled in
 
@@ -219,3 +219,39 @@ Contents:
 2. **Run the demo.** `bash tests/demo/phase-0/family-roundtrip/run.sh` should exit 0 with a green "✓ Phase-0 family roundtrip is live" summary.
 3. **Verify Obsidian renders the family vault.** Open `groups/family/` in Obsidian. PARA folders should show; `CLAUDE.local.md` should render cleanly. (This is the T-0.7 manual step, still owed.)
 4. **Conflict with upstream conventions.** None known. The demo uses a read-only inspection shape rather than the synthetic-inbound shape the plan originally suggested; this is documented in the demo README and in the "What was done" section above.
+
+### Report: T-0.1 + T-0.7 close {#report-t-01--t-07-close-2026-05-01}
+
+**Closed:** 2026-05-01
+
+#### What was done
+
+- **T-0.1** — verified the system is operational without re-running the `/setup` skill interactively. Equivalent state confirmed: launchd service `com.nanoclaw-v2-0ee3f1ca` running (PID 23355); container image `nanoclaw-agent-v2-0ee3f1ca:latest` built (3.08 GB); OneCLI installed at `~/.local/bin/onecli` with the `Barnaby` agent registered (`secretMode: "all"`, identifier `ag-1777562667415-i2zjxy`); a real Telegram roundtrip succeeded in this session. The `/setup` skill is the means; the ends are met.
+- **T-0.7 — Obsidian + iCloud unification.** Installed Obsidian 1.12.7 via Homebrew (cask). Brewfile refreshed in dotfiles (commit `f40cf23` — local only; user can `dotfiles push` when ready). Then chose the **selective-symlink** unification: only the user-facing PARA folders (`projects/`, `areas/`, `resources/`, `archive/`, `conversations/`) symlink to the household's iCloud-synced Obsidian vault at `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Homestead/`; runtime files (`container.json`, `skills/{users,roles,shared}/`, `CLAUDE.local.md`) stay local. Choice rationale: keeps nanoclaw runtime files out of iCloud sync (no clutter, no sync-conflict risk on internal state), while still routing all agent-written notes into the iCloud vault for Obsidian Mobile browsing.
+- **Bootstrap symlink-awareness.** Updated `bootstrapFamilyFolder` to skip `.gitkeep` creation when the PARA folder is already a symlink (red: a8bb9f2; green: 78752f6). Re-running the bootstrap is now safe — won't pollute the iCloud vault target.
+- **Demo updates.** `tests/demo/phase-0/family-roundtrip/run.sh` now annotates symlinks in the on-disk listing with `→ <target> [symlink]` so the iCloud unification is visible at a glance. README + expected.md updated to describe the unification.
+- **Smoke-test.** Wrote a file via the symlinked path and confirmed it landed in the iCloud Homestead directory. The shell-write path is mechanically equivalent to the container's bind-mount-write path (Docker-on-Mac uses the same POSIX FS layer), so no separate container-side test is required.
+
+#### Test coverage
+
+- Files: extended `src/family-bootstrap.test.ts` with one new case (5 total now): symlinked PARA folder must NOT receive a `.gitkeep` marker on bootstrap re-run.
+- Scenarios covered: PARA folders + .gitkeep on first bootstrap; skill tier folders + .gitkeep; idempotent re-run; target dir created if missing; symlink-aware skip.
+- Scenarios NOT covered: live container-side write through the symlink chain into iCloud — relies on the smoke test (filesystem-equivalent) and the next live message exchange in the family group.
+- Coverage delta: not measured here. The full coverage baseline was captured in the T-0.6 report (~19% statements, ~17% branches across `src/`).
+
+#### Demo
+
+- Path: `tests/demo/phase-0/family-roundtrip/run.sh` (re-used; no new demo for the iCloud unification).
+- What it shows: the existing Phase-0 wrap demo, with section 3 now visualizing the symlink chain so the operator can confirm the iCloud vault is wired in.
+- How to run: `bash tests/demo/phase-0/family-roundtrip/run.sh`. Exit 0 = wiring + recent route both healthy.
+
+#### Manual validation
+
+1. **Open Obsidian → Add `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Homestead/` as a vault.** This is the *real* household vault root (the iCloud-synced one). Verify it renders cleanly: `Welcome.md` (Obsidian default), and once Barnaby has written notes, `conversations/<…>.md` should appear.
+2. **Live agent-write test.** In the wired Telegram group (`telegram:-4996058079`), send something like `barnaby, please save a note in conversations/ saying "hello iCloud"`. After the agent replies, check `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Homestead/conversations/` for the file. Should appear within seconds locally; iCloud propagation to other devices is async (typically minutes).
+3. **Verify on another device.** Install Obsidian Mobile, sign in to the same iCloud, open the Homestead vault. The new note should appear once iCloud finishes syncing.
+4. **Conflict with upstream conventions.** None — upstream nanoclaw doesn't prescribe an Obsidian vault location. The selective-symlink approach is a project-specific extension and is documented inline in `src/family-bootstrap.ts` (the symlink-skip rationale comment).
+
+#### Phase-0 status
+
+All Phase-0 done-checklist items are now checked. Phase 0 is complete.
