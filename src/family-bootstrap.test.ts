@@ -59,4 +59,23 @@ describe('bootstrapFamilyFolder', () => {
     bootstrapFamilyFolder(target);
     expect(statSync(target).isDirectory()).toBe(true);
   });
+
+  it('does not write .gitkeep into a PARA folder that is already a symlink', async () => {
+    // Phase-0 follow-on: the family agent's PARA folders may be symlinked
+    // out to an Obsidian / iCloud vault root for browsing. Re-running the
+    // bootstrap must not pollute the symlinked target with .gitkeep files.
+    const { mkdirSync: mk, symlinkSync } = await import('node:fs');
+    const externalRoot = join(baseDir, 'external-vault');
+    mk(externalRoot, { recursive: true });
+    mk(target, { recursive: true });
+    const externalConv = join(externalRoot, 'conversations');
+    mk(externalConv, { recursive: true });
+    symlinkSync(externalConv, join(target, 'conversations'));
+
+    bootstrapFamilyFolder(target);
+
+    expect(existsSync(join(externalConv, '.gitkeep'))).toBe(false);
+    // Other PARA folders that were NOT symlinked should still get .gitkeep.
+    expect(existsSync(join(target, 'projects', '.gitkeep'))).toBe(true);
+  });
 });
