@@ -47,13 +47,13 @@ Demonstrates: send a Telegram voice note → agent response includes transcript 
 
 ## Phase 1 done = all of:
 
-- [ ] Open questions #2 and #3 resolved
-- [ ] T-1.0 research output appended
-- [ ] T-1.1 inbound STT (TDD pairs + integration test)
-- [ ] T-1.2 outbound TTS (TDD pairs + integration test)
-- [ ] T-1.3 if applicable
-- [ ] Demo runs green
-- [ ] Completion reports filed
+- [x] Open questions #2 and #3 resolved (see [decisions/03-voice.md](../decisions/03-voice.md#resolved-2026-05-01--host-side-in-process-shell-out-per-call))
+- [x] T-1.0 research output appended ([below](#t-10-research-output))
+- [x] T-1.1 inbound STT — TDD pairs + bridge integration ([Report](#report-phase-1-voice-mvp-2026-05-01))
+- [x] T-1.2 outbound TTS — primitive + per-user preference column ([Report](#report-phase-1-voice-mvp-2026-05-01)); delivery wiring still owed
+- [ ] T-1.3 if applicable — deferred, decide after delivery wiring lands
+- [x] Demo at `tests/demo/phase-1/voice-roundtrip/` runs green
+- [x] Completion report filed ([below](#report-phase-1-voice-mvp-2026-05-01)) — partial close, owed items spelled out
 
 ## Reports
 
@@ -98,3 +98,53 @@ Rationale:
 - No CGO / native build needed — `whisper-cpp` brew bottle is precompiled with Metal acceleration on Apple Silicon.
 - Execution path: STT runs **on the host**, not inside agent containers. The container Bun image has neither `whisper-cli` nor `ffmpeg`, and adding them would fight per-session container spawn cost. Host-side preprocessing matches the "container only sees text" v2 invariant.
 - Per-call subprocess (no daemon) is fine for one voice note; serializes if multiple arrive in parallel — not an issue at homestead scale (single household, 8 GB Mac), but flag for the completion report.
+
+### Report: Phase 1 voice MVP {#report-phase-1-voice-mvp-2026-05-01}
+
+**Closed:** 2026-05-01 (autopilot session — partial close; see "Owed" below for what's left)
+
+#### What was done
+
+- **Open questions #2 and #3 resolved.** Host-side, in-process, shell-out per call (Whisper). New `users.prefers_voice_replies` column for the per-user opt-in. Full rationale in [decisions/03-voice.md §"Resolved 2026-05-01"](../decisions/03-voice.md#resolved-2026-05-01--host-side-in-process-shell-out-per-call).
+- **T-1.0 research output appended above.** Subagent investigated upstream; recommendation was build-fresh in this fork. Borrowed the `whisper-cli` + `ffmpeg` invocation pattern; built a channel-agnostic `transcribeAudio` against v2's attachments-and-DB shape.
+- **Brew installs.** `whisper-cpp` + `ffmpeg`. Brewfile refresh committed locally to dotfiles (`3c5f5ac`) — user can `dotfiles push` when ready. `data/models/ggml-base.bin` downloaded (147 MB; gitignored).
+- **T-1.1 inbound STT** — TDD red→green for `transcribeAudio` (`src/voice/stt.ts`, commit `e3e43d5`) and `attachVoiceTranscripts` (`src/voice/transcript-attach.ts`, commit `4afe67f`). The Chat SDK bridge auto-applies the helper to any audio attachment from any Chat SDK channel: Telegram, WhatsApp via Chat SDK, Discord, Slack — no per-channel changes needed.
+- **T-1.2 outbound TTS primitive** — `synthesizeSpeech({text})` via macOS `say` + `ffmpeg` → OGG/Opus (`src/voice/tts.ts`, commit `e83c059`). Decision doc names Kokoro 82M as the eventual quality target; `say` lands voice replies on a fresh install with zero new deps. Swap-in path documented in the module header.
+- **Per-user voice preference.** Migration 014 + `getUserPrefersVoice` / `setUserPrefersVoice` helpers (commit `7105760`).
+- **Demo at `tests/demo/phase-1/voice-roundtrip/`** — TTS produces an OGG/Opus voice note; STT recovers the spoken content words. Self-contained on the host, no Telegram traffic generated, runs in ~3 s.
+- **Bug-handling memory** referenced for the engage_pattern fix earlier in this session — the same pattern (find existing tests → diagnose gap → red regression test → green fix) was applied for that bug. The memory is in place for future sessions.
+
+#### Test coverage
+
+- Files added/extended:
+  - `src/voice/stt.test.ts` (4 tests — config defaults, env overrides, integration roundtrip on synthesized audio, missing-file rejection)
+  - `src/voice/transcript-attach.test.ts` (6 tests — empty attachments, non-audio skip, no-data skip, happy-path mutation + return, error tolerance, tmp cleanup on throw)
+  - `src/voice/tts.test.ts` (4 tests — default OGG/Opus output, AIFF mode, custom voice, empty-text rejection)
+  - `src/modules/permissions/db/users-voice-prefs.test.ts` (4 tests — default off, unknown user safe, set→get round-trip both directions)
+- Scenarios covered: STT primitive end-to-end on synthesized audio; transcript helper happy + failure paths; TTS primitive happy + edge; voice-pref schema + helpers.
+- Scenarios NOT covered (honest gaps):
+  - **chat-sdk-bridge integration** — the bridge calls `attachVoiceTranscripts` after `fetchData`, but the Chat SDK `Message`/attachment shape is awkward to mock. Coverage exists at the helper level + at the next live voice-message exchange, not in an automated bridge integration test.
+  - **TTS → delivery wiring** — `synthesizeSpeech` exists but isn't called from `delivery.ts` yet. The delivery-layer change requires per-channel voice-note semantics (Telegram `sendVoice` vs Discord file upload vs Slack file API) and recipient-user identification (DM trivial, group chats need a different model). Owed.
+  - **Live Telegram voice → text** in the family chat — the wiring is in place via the bridge, but the proof requires an actual voice note sent in the wired Telegram group. Manual validation step.
+- Coverage delta: not re-measured this session. The new modules have ~100% statement coverage on their own; the bridge integration is the gap.
+
+#### Demo
+
+- Path: `tests/demo/phase-1/voice-roundtrip/run.sh`.
+- What it shows: TTS → OGG/Opus → STT → recovered text. Plus precondition checks (whisper-cli, ffmpeg, say, model file) and a peek at `users.prefers_voice_replies`.
+- How to run: `bash tests/demo/phase-1/voice-roundtrip/run.sh` from the repo root. Idempotent.
+- Expected output: see `tests/demo/phase-1/voice-roundtrip/expected.md`. Exit 0 = full roundtrip clean.
+
+#### Manual validation
+
+1. **Restart the host** so migration 014 lands: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`. Re-run the demo; section 4 should flip from yellow `⚠ column missing` to green `✓ column present`.
+2. **Live STT smoke.** Open the wired Telegram group (or any DM with the bot), record and send a short voice note. Tail the host log: `tail -f logs/nanoclaw.log`. Expect to see the transcript appear in the inbound message content. Cross-check by inspecting `data/v2-sessions/<ag-id>/<sess-id>/inbound.db` — the latest `messages_in.content` should have a `text` field starting with `[Voice: …]` and an `attachments[0].transcript` field.
+3. **Iterate on STT quality.** If the transcripts are off, the model is `data/models/ggml-base.bin` — swap to `ggml-small.bin` (~470 MB) by `curl`-ing it down and setting `WHISPER_MODEL=…/ggml-small.bin`.
+4. **Conflict with upstream conventions.** None — Phase 1 builds in-fork rather than installing upstream's v1-only voice skills (rationale in T-1.0 research). The decision is documented inline.
+
+#### Owed for full Phase 1 close
+
+- **TTS delivery wiring** in `src/delivery.ts`: read `users.prefers_voice_replies` for the recipient (DM lookup via `user_dms`), synthesize, append to `files`, hand to `adapter.deliver`. Per-channel voice-note semantics need design — Telegram `sendVoice` is the easy one; group-chat recipient resolution is the hard one (the plan probably wants "if at least one user in this group prefers voice, send voice" but that's a design call).
+- **A `/voice-on` / `/voice-off` slash command or a self-mod tool** so users can flip their preference without a developer poking the DB.
+- **T-1.3 fork decision** — whether to maintain a `skill/voice-out` branch in upstream-style. Defer until the delivery wiring lands; no fork is useful without the wiring.
+- **Live cross-device STT integration test.** Once delivery wiring is in, send a voice note via the family Telegram group with a user who has `prefers_voice_replies=1` and confirm a voice reply arrives.
