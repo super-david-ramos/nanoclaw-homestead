@@ -24,6 +24,7 @@ Reference (load on demand):
 | [03-capability-mapping.md](03-capability-mapping.md) | homestead-ts capability → nanoclaw v2 mechanism table |
 | [04-entity-model.md](04-entity-model.md) | proposed users, roles, agent groups (family / kids / guest / main) |
 | [06-open-questions.md](06-open-questions.md) | unresolved design questions |
+| [follow-ups.md](follow-ups.md) | deferred work surfaced mid-phase — pick up in a future session |
 
 ## Working pattern
 
