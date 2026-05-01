@@ -17,6 +17,7 @@ import {
   type Message as ChatMessage,
 } from 'chat';
 import { log } from '../log.js';
+import { attachVoiceTranscripts } from '../voice/transcript-attach.js';
 import { SqliteStateAdapter } from '../state-sqlite.js';
 import { registerWebhookAdapter } from '../webhook-server.js';
 import { getAskQuestionRender } from '../db/sessions.js';
@@ -156,6 +157,18 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
         }
         enriched.push(entry);
       }
+      // Voice STT — for any audio attachment we just downloaded, transcribe
+      // via local Whisper (host-side) and mutate the entry with a `transcript`
+      // field. The collected transcripts also splice into the message text so
+      // an agent that doesn't inspect the attachments array still gets the
+      // spoken content. Failure-tolerant: see attachVoiceTranscripts.
+      const transcripts = await attachVoiceTranscripts(enriched);
+      if (transcripts.length > 0) {
+        const existing = typeof serialized.text === 'string' ? serialized.text : '';
+        const voiceText = `[Voice: ${transcripts.join(' / ')}]`;
+        serialized.text = existing ? `${existing}\n\n${voiceText}` : voiceText;
+      }
+
       serialized.attachments = enriched;
     }
 
