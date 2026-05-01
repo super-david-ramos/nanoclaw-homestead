@@ -19,6 +19,14 @@ import {
 import { log } from '../log.js';
 import { attachVoiceTranscripts } from '../voice/transcript-attach.js';
 import { SqliteStateAdapter } from '../state-sqlite.js';
+
+/**
+ * Regex registered with chat.onNewMessage. Must match an empty string so the
+ * dispatcher fires for voice-only / image-only / file-only messages too —
+ * `/./` (the original) silently dropped voice notes. See the comment block
+ * around the registration site for the full rationale.
+ */
+export const ANY_MESSAGE_PATTERN = /.*/;
 import { registerWebhookAdapter } from '../webhook-server.js';
 import { getAskQuestionRender } from '../db/sessions.js';
 import { normalizeOptions, type NormalizedOption } from './ask-question.js';
@@ -273,13 +281,18 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       //
       // Chat SDK dispatch (handling-events.mdx §"Handler dispatch order") is
       // exclusive: subscribed → onSubscribedMessage; unsubscribed+mention →
-      // onNewMention; unsubscribed+pattern-match → onNewMessage. Registering
-      // with `/./` lets the router see every plain message on every
-      // unsubscribed thread the bot can see. The router short-circuits via
+      // onNewMention; unsubscribed+pattern-match → onNewMessage. The
+      // dispatcher tests our pattern against `message.text` — voice-only
+      // messages have empty text, so any pattern that requires ≥1 char
+      // (the original `/./`) silently drops voice notes before they ever
+      // reach the bridge. ANY_MESSAGE_PATTERN matches empty text too, so
+      // attachment-only messages (voice, image, file) flow through and
+      // either engage via STT-augmented text (voice) or stay silent at
+      // the engage check (everything else). The router short-circuits via
       // getMessagingGroupWithAgentCount (~1 DB read) for unwired channels,
       // so forwarding every one is cheap enough to not need a bridge-side
       // flood gate.
-      chat.onNewMessage(/./, async (thread, message) => {
+      chat.onNewMessage(ANY_MESSAGE_PATTERN, async (thread, message) => {
         const channelId = adapter.channelIdFromThreadId(thread.id);
         await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, false, true));
       });

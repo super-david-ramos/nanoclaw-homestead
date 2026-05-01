@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Adapter } from 'chat';
 
-import { createChatSdkBridge, splitForLimit } from './chat-sdk-bridge.js';
+import { ANY_MESSAGE_PATTERN, createChatSdkBridge, splitForLimit } from './chat-sdk-bridge.js';
 
 function stubAdapter(partial: Partial<Adapter>): Adapter {
   return { name: 'stub', ...partial } as unknown as Adapter;
@@ -76,5 +76,17 @@ describe('createChatSdkBridge', () => {
       supportsThreads: true,
     });
     expect(typeof bridge.subscribe).toBe('function');
+  });
+
+  // The chat-sdk dispatcher tests our registered onNewMessage regex against
+  // `message.text`. Voice-only messages have empty text — any pattern that
+  // requires at least one character (e.g. `/./`) silently filters voice
+  // notes out before they reach the bridge. This was the bug that prevented
+  // STT from ever firing for voice notes in the wired Telegram group.
+  it('ANY_MESSAGE_PATTERN matches empty text so voice-only messages dispatch', () => {
+    expect(ANY_MESSAGE_PATTERN.test('')).toBe(true);
+    expect(ANY_MESSAGE_PATTERN.test('hello')).toBe(true);
+    // Negative case: confirm we did NOT keep the bug — `/./` would fail empty.
+    expect(/./.test('')).toBe(false);
   });
 });
