@@ -26,6 +26,7 @@ import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles } from './s
 import { pauseTypingRefreshAfterDelivery, setTypingAdapter } from './modules/typing/index.js';
 import type { OutboundFile } from './channels/adapter.js';
 import type { Session } from './types.js';
+import { synthesizeReplyFile, triggeredByVoice } from './voice/voice-reply.js';
 
 const ACTIVE_POLL_MS = 1000;
 const SWEEP_POLL_MS = 60_000;
@@ -347,10 +348,17 @@ async function deliverMessage(
   // Read file attachments from outbox if the content declares files.
   // File I/O lives in session-manager.ts (symmetric with inbound
   // extractAttachmentFiles) — delivery just hands buffers to the adapter.
-  const files =
+  const outboxFiles =
     Array.isArray(content.files) && content.files.length > 0
       ? readOutboxFiles(session.agent_group_id, session.id, msg.id, content.files as string[])
       : undefined;
+
+  // Voice-reply gate — "match the medium": if the most recent triggering
+  // inbound message had an audio attachment, voice-reply. Symmetric across
+  // DM and group; no recipient-identity resolution needed. Failure-tolerant
+  // — TTS errors fall back to text-only delivery, never block the message.
+  const voiceFile = await maybeAttachVoiceReply(msg, content, inDb);
+  const files = voiceFile ? [...(outboxFiles ?? []), voiceFile] : outboxFiles;
 
   const platformMsgId = await deliveryAdapter.deliver(
     msg.channel_type,
@@ -371,6 +379,50 @@ async function deliverMessage(
   clearOutbox(session.agent_group_id, session.id, msg.id);
 
   return platformMsgId;
+}
+
+/**
+ * Compute the voice-reply attachment for an outbound message, or null.
+ *
+ * Rule: "match the medium" — if the most recent triggering inbound message
+ * had any audio/* attachment, the user spoke, so the agent voice-replies.
+ * Symmetric across DM and group; no recipient-identity resolution needed.
+ *
+ * Failure-tolerant: any error (DB read, JSON parse, TTS subprocess) returns
+ * null + warns. Voice is an enhancement; the text reply must always go out.
+ *
+ * Only fires for kind='chat' with a non-empty text field. Structured kinds
+ * (ask_question cards, etc.) stay text-only.
+ */
+async function maybeAttachVoiceReply(
+  msg: { id: string; kind: string },
+  content: Record<string, unknown>,
+  inDb: Database.Database,
+): Promise<OutboundFile | null> {
+  try {
+    if (msg.kind !== 'chat') return null;
+    const text = typeof content.text === 'string' ? content.text.trim() : '';
+    if (!text) return null;
+
+    const row = inDb
+      .prepare("SELECT content FROM messages_in WHERE trigger = 1 ORDER BY seq DESC LIMIT 1")
+      .get() as { content: string } | undefined;
+    if (!row) return null;
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(row.content) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+
+    if (!triggeredByVoice(parsed)) return null;
+
+    return await synthesizeReplyFile({ text });
+  } catch (err) {
+    log.warn('Voice-reply synthesis failed; falling back to text-only', { messageId: msg.id, err });
+    return null;
+  }
 }
 
 /**
