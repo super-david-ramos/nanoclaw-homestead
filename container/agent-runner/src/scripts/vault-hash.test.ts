@@ -241,3 +241,132 @@ describe('fsWatcherDecide', () => {
     expect(decision.wakeAgent).toBe(false);
   });
 });
+
+// -----------------------------------------------------------------------------
+// per-file diff (T-2.2 follow-up: agent needs to know WHAT changed, not just
+// THAT something changed — without it, Barnaby correctly stays silent on every
+// fire because he can't tell whether the change is noteworthy)
+// -----------------------------------------------------------------------------
+
+describe('fsWatcherDecide diff', () => {
+  it('content edit reports the relpath under modified, leaves added/removed empty', () => {
+    write('areas/health.md', 'v1');
+    write('projects/garden.md', 'g1');
+    fsWatcherDecide(VAULT, STATE);
+
+    write('areas/health.md', 'v2');
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    expect(decision.wakeAgent).toBe(true);
+    expect(decision.data.modified).toEqual(['areas/health.md']);
+    expect(decision.data.added).toEqual([]);
+    expect(decision.data.removed).toEqual([]);
+  });
+
+  it('new file reports the relpath under added', () => {
+    write('areas/health.md', 'v1');
+    fsWatcherDecide(VAULT, STATE);
+
+    write('projects/garden.md', 'g1');
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    expect(decision.wakeAgent).toBe(true);
+    expect(decision.data.added).toEqual(['projects/garden.md']);
+    expect(decision.data.modified).toEqual([]);
+    expect(decision.data.removed).toEqual([]);
+  });
+
+  it('deleted file reports the relpath under removed', () => {
+    write('areas/health.md', 'v1');
+    write('projects/garden.md', 'g1');
+    fsWatcherDecide(VAULT, STATE);
+
+    fs.rmSync(path.join(VAULT, 'projects/garden.md'));
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    expect(decision.wakeAgent).toBe(true);
+    expect(decision.data.removed).toEqual(['projects/garden.md']);
+    expect(decision.data.added).toEqual([]);
+    expect(decision.data.modified).toEqual([]);
+  });
+
+  it('moved file shows up as removed-then-added (path change is what matters semantically)', () => {
+    write('areas/health.md', 'v1');
+    fsWatcherDecide(VAULT, STATE);
+
+    fs.mkdirSync(path.join(VAULT, 'projects'), { recursive: true });
+    fs.renameSync(path.join(VAULT, 'areas/health.md'), path.join(VAULT, 'projects/health.md'));
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    expect(decision.wakeAgent).toBe(true);
+    expect(decision.data.removed).toEqual(['areas/health.md']);
+    expect(decision.data.added).toEqual(['projects/health.md']);
+    expect(decision.data.modified).toEqual([]);
+  });
+
+  it('mixed change populates all three lists, sorted by relpath', () => {
+    write('a.md', 'a1');
+    write('b.md', 'b1');
+    write('c.md', 'c1');
+    fsWatcherDecide(VAULT, STATE);
+
+    write('a.md', 'a2'); // modified
+    fs.rmSync(path.join(VAULT, 'b.md')); // removed
+    write('d.md', 'd1'); // added
+    write('e.md', 'e1'); // added
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    expect(decision.wakeAgent).toBe(true);
+    expect(decision.data.modified).toEqual(['a.md']);
+    expect(decision.data.removed).toEqual(['b.md']);
+    expect(decision.data.added).toEqual(['d.md', 'e.md']);
+  });
+
+  it('first run does not include diff lists — they are not meaningful pre-baseline', () => {
+    write('a.md', 'a1');
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    expect(decision.wakeAgent).toBe(false);
+    expect(decision.data.firstRun).toBe(true);
+    expect(decision.data.added).toBeUndefined();
+    expect(decision.data.removed).toBeUndefined();
+    expect(decision.data.modified).toBeUndefined();
+  });
+
+  it('persists per-file hashes so successive ticks can diff the next tick', () => {
+    write('a.md', 'a1');
+    write('b.md', 'b1');
+    fsWatcherDecide(VAULT, STATE);
+
+    const persisted = JSON.parse(fs.readFileSync(STATE, 'utf8')) as {
+      files?: Record<string, string>;
+    };
+    expect(persisted.files).toBeDefined();
+    expect(Object.keys(persisted.files!).sort()).toEqual(['a.md', 'b.md']);
+    // Hashes are non-empty strings.
+    expect(persisted.files!['a.md'].length).toBeGreaterThan(0);
+    expect(persisted.files!['b.md'].length).toBeGreaterThan(0);
+  });
+
+  it('legacy state file (no per-file map) is treated as missing — re-baselines silently', () => {
+    // Simulate an old state file from before the per-file upgrade.
+    write('a.md', 'a1');
+    fs.writeFileSync(
+      STATE,
+      JSON.stringify({ hash: 'legacy-hash', fileCount: 1, updatedAt: new Date().toISOString() }),
+    );
+
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    // Silent re-baseline — no spurious wake from the format upgrade.
+    expect(decision.wakeAgent).toBe(false);
+    expect(decision.data.firstRun).toBe(true);
+
+    // The new state file has the per-file map.
+    const persisted = JSON.parse(fs.readFileSync(STATE, 'utf8')) as {
+      files?: Record<string, string>;
+    };
+    expect(persisted.files).toBeDefined();
+    expect(Object.keys(persisted.files!)).toEqual(['a.md']);
+  });
+});
