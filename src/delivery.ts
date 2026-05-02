@@ -404,9 +404,9 @@ async function maybeAttachVoiceReply(
     const text = typeof content.text === 'string' ? content.text.trim() : '';
     if (!text) return null;
 
-    const row = inDb
-      .prepare("SELECT content FROM messages_in WHERE trigger = 1 ORDER BY seq DESC LIMIT 1")
-      .get() as { content: string } | undefined;
+    const row = inDb.prepare('SELECT content FROM messages_in WHERE trigger = 1 ORDER BY seq DESC LIMIT 1').get() as
+      | { content: string }
+      | undefined;
     if (!row) return null;
 
     let parsed: Record<string, unknown>;

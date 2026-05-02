@@ -62,18 +62,7 @@ export async function synthesizeSpeech(opts: SynthesizeOpts): Promise<Synthesize
   // quiet on success — errors surface via the rejected execFileP promise.
   const oggPath = aiffPath.replace(/\.aiff$/, '.ogg');
   try {
-    await execFileP('ffmpeg', [
-      '-y',
-      '-loglevel',
-      'error',
-      '-i',
-      aiffPath,
-      '-c:a',
-      'libopus',
-      '-b:a',
-      '24k',
-      oggPath,
-    ]);
+    await execFileP('ffmpeg', ['-y', '-loglevel', 'error', '-i', aiffPath, '-c:a', 'libopus', '-b:a', '24k', oggPath]);
   } finally {
     rmSync(aiffPath, { force: true });
   }
