@@ -98,6 +98,7 @@ describe('computeVaultState', () => {
     write('a.md', 'same content');
     const before = computeVaultState(VAULT).hash;
 
+    fs.mkdirSync(path.join(VAULT, 'subdir'), { recursive: true });
     fs.renameSync(path.join(VAULT, 'a.md'), path.join(VAULT, 'subdir/a.md'));
     const after = computeVaultState(VAULT).hash;
 
