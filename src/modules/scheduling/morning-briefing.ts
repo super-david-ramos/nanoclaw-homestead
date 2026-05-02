@@ -51,7 +51,7 @@ export function scheduleMorningBriefing(
   const interval = CronExpressionParser.parse(opts.cron, {
     tz: opts.timezone ?? TIMEZONE,
   });
-  const nextRun = interval.next().toISOString();
+  const nextRun = interval.next().toDate().toISOString();
 
   insertTask(inDb, {
     id: MORNING_BRIEFING_SERIES_ID,
