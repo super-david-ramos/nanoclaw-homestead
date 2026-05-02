@@ -36,9 +36,7 @@ describe('scheduleMorningBriefing', () => {
     expect(result.taskId).toBe(MORNING_BRIEFING_SERIES_ID);
 
     const row = db
-      .prepare(
-        "SELECT id, series_id, kind, recurrence, status, content FROM messages_in WHERE id = ?",
-      )
+      .prepare('SELECT id, series_id, kind, recurrence, status, content FROM messages_in WHERE id = ?')
       .get(MORNING_BRIEFING_SERIES_ID) as {
       id: string;
       series_id: string;
@@ -72,9 +70,7 @@ describe('scheduleMorningBriefing', () => {
     expect(second.taskId).toBe(first.taskId);
 
     const count = db
-      .prepare(
-        "SELECT COUNT(*) AS n FROM messages_in WHERE series_id = ? AND status IN ('pending','paused')",
-      )
+      .prepare("SELECT COUNT(*) AS n FROM messages_in WHERE series_id = ? AND status IN ('pending','paused')")
       .get(MORNING_BRIEFING_SERIES_ID) as { n: number };
     expect(count.n).toBe(1);
     db.close();
@@ -85,15 +81,13 @@ describe('scheduleMorningBriefing', () => {
     // as a fresh pending row — the user's pause stands.
     const db = freshDb();
     scheduleMorningBriefing(db, { prompt: 'Brief us.', cron: '45 6 * * *' });
-    db.prepare("UPDATE messages_in SET status = 'paused' WHERE series_id = ?").run(
-      MORNING_BRIEFING_SERIES_ID,
-    );
+    db.prepare("UPDATE messages_in SET status = 'paused' WHERE series_id = ?").run(MORNING_BRIEFING_SERIES_ID);
 
     const second = scheduleMorningBriefing(db, { prompt: 'Brief us.', cron: '45 6 * * *' });
     expect(second.created).toBe(false);
 
     const stillPaused = db
-      .prepare("SELECT status FROM messages_in WHERE series_id = ?")
+      .prepare('SELECT status FROM messages_in WHERE series_id = ?')
       .get(MORNING_BRIEFING_SERIES_ID) as { status: string };
     expect(stillPaused.status).toBe('paused');
     db.close();
@@ -105,9 +99,9 @@ describe('scheduleMorningBriefing', () => {
     // setup script must find that follow-up rather than re-inserting.
     const db = freshDb();
     scheduleMorningBriefing(db, { prompt: 'Brief us.', cron: '45 6 * * *' });
-    db.prepare(
-      "UPDATE messages_in SET status = 'completed', recurrence = NULL WHERE id = ?",
-    ).run(MORNING_BRIEFING_SERIES_ID);
+    db.prepare("UPDATE messages_in SET status = 'completed', recurrence = NULL WHERE id = ?").run(
+      MORNING_BRIEFING_SERIES_ID,
+    );
     db.prepare(
       `INSERT INTO messages_in (id, seq, timestamp, status, tries, recurrence, kind, content, series_id)
        VALUES ('mb-next', 998, datetime('now'), 'pending', 0, '45 6 * * *', 'task', '{"prompt":"x","script":null}', ?)`,
@@ -131,9 +125,9 @@ describe('scheduleMorningBriefing', () => {
     });
     const after = Date.now();
 
-    const row = db
-      .prepare("SELECT process_after FROM messages_in WHERE id = ?")
-      .get(MORNING_BRIEFING_SERIES_ID) as { process_after: string };
+    const row = db.prepare('SELECT process_after FROM messages_in WHERE id = ?').get(MORNING_BRIEFING_SERIES_ID) as {
+      process_after: string;
+    };
 
     const expected = CronExpressionParser.parse('45 6 * * *', {
       tz: 'America/Los_Angeles',
