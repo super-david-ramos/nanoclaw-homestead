@@ -50,8 +50,8 @@ Demonstrates: send a Telegram voice note → agent response includes transcript 
 - [x] Open questions #2 and #3 resolved (see [decisions/03-voice.md](../decisions/03-voice.md#resolved-2026-05-01--host-side-in-process-shell-out-per-call))
 - [x] T-1.0 research output appended ([below](#t-10-research-output))
 - [x] T-1.1 inbound STT — TDD pairs + bridge integration ([Report](#report-phase-1-voice-mvp-2026-05-01))
-- [x] T-1.2 outbound TTS — primitive + per-user preference column ([Report](#report-phase-1-voice-mvp-2026-05-01)); delivery wiring still owed
-- [ ] T-1.3 if applicable — deferred, decide after delivery wiring lands
+- [x] T-1.2 outbound TTS — primitive + delivery wiring + live-verified ([Report](#report-phase-1-voice-mvp-2026-05-01))
+- [ ] T-1.3 if applicable — deferred; voice-out shipped without a fork branch and that's working in production
 - [x] Demo at `tests/demo/phase-1/voice-roundtrip/` runs green
 - [x] Completion report filed ([below](#report-phase-1-voice-mvp-2026-05-01)) — partial close, owed items spelled out
 
@@ -161,3 +161,43 @@ launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
 ```
 
 The Phase-1 demo's section 4 is the diagnostic — it flips from yellow `⚠ column missing` to green `✓ column present` after the restart.
+
+### Report: Phase 1 close — TTS delivery + live verification {#report-phase-1-close-2026-05-02}
+
+**Closed:** 2026-05-02
+
+Phase 1 is now end-to-end live-verified by the user. Voice notes in the wired Telegram group transcribe via Whisper and engage Barnaby; Barnaby's replies arrive as audio when the triggering message was a voice note, as text otherwise.
+
+#### What was added since the partial close (2026-05-01 → 2026-05-02)
+
+- **Production-debug bug fix.** Inbound voice notes weren't reaching the bridge at all — the `chat-sdk` dispatcher tests our `onNewMessage` regex against `message.text`, voice-only messages have empty text, and `/./` (one-or-more chars) silently filtered them out. Fix: extracted `ANY_MESSAGE_PATTERN = /.*/` and registered with that. Regression test asserts both directions (the new pattern matches empty, the old pattern doesn't). Commit `0d2524f`.
+- **launchd plist PATH fix.** Added `/opt/homebrew/bin` to the `EnvironmentVariables.PATH` in `~/Library/LaunchAgents/com.nanoclaw-v2-*.plist` so the launchd-spawned host can find `whisper-cli` and `ffmpeg`. The exact gotcha called out in the T-1.0 research one-pager — caught at the live-test step, fixed in place. Plist not in this repo (per-install).
+- **Voice-reply rule chosen + shipped.** The DM-only TTS scope I deferred at the 2026-05-01 close was unblocked by a better rule from the user: **"only voice-reply when the triggering message was a voice note."** Symmetric in DM and group; no recipient-identity resolution needed. `src/voice/voice-reply.ts` exports `triggeredByVoice` (pure decision over `attachments[].mimeType.startsWith('audio/')`) and `synthesizeReplyFile` (wraps `synthesizeSpeech`, returns the `OutboundFile` shape). Wired into `delivery.ts` `deliverMessage` via `maybeAttachVoiceReply`, which reads the most recent `trigger=1` row from the session's `inbound.db` and decides per outbound message. Failure-tolerant: any error returns null + warns, text-only delivery never blocks. Commit `2da1a0a`.
+- **Family chat is now always-engage.** Switched `engage_pattern` from `\b[Bb][Aa][Rr][Nn][Aa][Bb][Yy]\b` to `.` for the family wiring per user request — Barnaby responds to every message in the Homestead Chat, not just wake-word matches. SQL one-liner; no code change.
+
+#### Test coverage delta since 2026-05-01
+
+- Added `src/voice/voice-reply.test.ts` (8 tests — `triggeredByVoice` happy / non-audio / mixed / malformed / non-array; `synthesizeReplyFile` Buffer + cleanup + reject-empty).
+- Added `ANY_MESSAGE_PATTERN` regression test in `src/channels/chat-sdk-bridge.test.ts`.
+- Full host suite at 277/277.
+
+#### Demo
+
+`tests/demo/phase-1/voice-roundtrip/run.sh` is unchanged and still passes (it exercises the host-side primitives, not the live channel). The live integration was verified by the user sending real voice notes in the family Telegram group and watching Barnaby reply with audio.
+
+#### Manual validation
+
+User-confirmed working as of 2026-05-02:
+
+1. Voice note in Homestead Chat → transcript visible in inbound; Barnaby's reply arrives as audio.
+2. Text in Homestead Chat → text reply (no spurious voice synthesis).
+
+#### Caveats and follow-ups
+
+- **Telegram voice-note UX.** chat-sdk Telegram adapter ships all files via `sendDocument` — the OGG/Opus arrives as an audio attachment with a play button rather than as the native Telegram voice-note UI (waveform, in-app inline player). Functionally equivalent for listening; UX delta is real. To get the native UI we'd need to call Telegram's `sendVoice` directly, which means bypassing chat-sdk for audio mime types or patching the chat-sdk Telegram adapter. Tracked in `docs/plan/follow-ups.md`.
+- **Always-engage in the family chat is noisy.** Every message wakes Barnaby, including family members chatting with each other. If/when this gets annoying, the wake-word pattern is one SQL command away (the original `\b[Bb][Aa][Rr][Nn][Aa][Bb][Yy]\b` is in the T-0.6 close report).
+- **`prefers_voice_replies` column unused for now.** Migration 014 shipped a per-user opt-in column that the "match the medium" rule supersedes. Keeping the column for future "always voice no matter what" override semantics; can drop in a future migration if the column never gets a use case.
+
+#### Phase 1 status
+
+Done. Voice in + voice out both live in the Homestead Chat. Phase 2 (proactive) is the next plan doc to read.
