@@ -40,11 +40,22 @@ import {
 
 const DEFAULT_PROMPT = `The household Obsidian vault changed.
 
-A few items in the household notes were added, edited, or removed since the
-last check. The vault-hash script's data is in your prompt — counts, hash
-delta. Decide if anything in the change deserves a chat-side note (e.g. a
-new project file the household started, a meaningful edit to a shared area
-note). If nothing stands out, stay quiet — silence is fine.`;
+The script attached a diff in your scriptOutput.data:
+  - added:    relpaths newly present
+  - removed:  relpaths gone
+  - modified: relpaths whose content changed
+
+You have read access to the vault at /workspace/extra/Homestead — open any
+of the changed files to see what's actually in them before deciding.
+
+Send a short note in the family chat that names what changed and adds value
+the household wouldn't get from just looking at the file list — e.g. surface
+a new project the household started, flag a meaningful edit to an area
+note, point out something worth their attention. One or two sentences.
+
+Stay silent only when the change is obviously trivial (e.g. a single file
+under areas/log/ that the household maintains as a stream-of-consciousness
+log and doesn't need surfaced).`;
 
 const DEFAULT_CRON = '*/15 * * * *';
 const DEFAULT_FOLDER = 'family';

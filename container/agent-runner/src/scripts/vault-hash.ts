@@ -22,6 +22,10 @@
  * - Missing vault root is a soft-fail: wakeAgent:false, vaultMissing flag in
  *   data. Failed mount or fresh deploy that hasn't symlinked yet shouldn't
  *   spam the agent with "vault disappeared!" wakes.
+ * - Per-file diff: state file persists a {relpath: fileHash} map so each tick
+ *   can return added/removed/modified lists. Without this the agent gets
+ *   only an aggregate hash delta, can't assess what the change is, and
+ *   correctly stays silent every fire (which makes the watcher useless).
  *
  * Tests live alongside in vault-hash.test.ts and run under bun:test.
  */
@@ -35,6 +39,8 @@ const EXCLUDE_BASENAMES = new Set(['.DS_Store']);
 export interface VaultState {
   hash: string;
   fileCount: number;
+  /** Per-file content hashes, keyed by vault-relative path. */
+  files: Record<string, string>;
 }
 
 export interface FsWatcherDecisionData {
@@ -43,6 +49,12 @@ export interface FsWatcherDecisionData {
   prevHash?: string;
   currHash?: string;
   vaultMissing?: boolean;
+  /** Relpaths newly present since the last tick. Sorted. */
+  added?: string[];
+  /** Relpaths gone since the last tick. Sorted. */
+  removed?: string[];
+  /** Relpaths whose content changed since the last tick. Sorted. */
+  modified?: string[];
 }
 
 export interface FsWatcherDecision {
@@ -90,12 +102,13 @@ function walkFiles(rootPath: string): Array<{ rel: string; abs: string }> {
 
 export function computeVaultState(rootPath: string): VaultState {
   if (!fs.existsSync(rootPath)) {
-    return { hash: '__MISSING__', fileCount: 0 };
+    return { hash: '__MISSING__', fileCount: 0, files: {} };
   }
   const files = walkFiles(rootPath);
   files.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
 
   const accumulator = createHash('sha256');
+  const perFile: Record<string, string> = {};
   for (const f of files) {
     let content: Buffer;
     try {
@@ -106,6 +119,7 @@ export function computeVaultState(rootPath: string): VaultState {
       continue;
     }
     const fileHash = createHash('sha256').update(content).digest('hex');
+    perFile[f.rel] = fileHash;
     // Including a separator avoids any chance of (rel, hash) collisions
     // where different inputs produce the same flat string.
     accumulator.update(f.rel);
@@ -116,13 +130,16 @@ export function computeVaultState(rootPath: string): VaultState {
 
   return {
     hash: accumulator.digest('hex'),
-    fileCount: files.length,
+    fileCount: Object.keys(perFile).length,
+    files: perFile,
   };
 }
 
 interface PersistedState {
   hash: string;
   fileCount: number;
+  /** Required since the per-file-diff upgrade. Legacy state files lack this. */
+  files: Record<string, string>;
   updatedAt: string;
 }
 
@@ -130,9 +147,13 @@ function readState(statePath: string): PersistedState | null {
   if (!fs.existsSync(statePath)) return null;
   try {
     const raw = fs.readFileSync(statePath, 'utf8');
-    const parsed = JSON.parse(raw) as PersistedState;
+    const parsed = JSON.parse(raw) as Partial<PersistedState>;
     if (typeof parsed.hash !== 'string') return null;
-    return parsed;
+    // Legacy state files (pre-per-file-diff) lack the `files` map. Treat as
+    // missing → re-baseline. The agent gets one silent tick instead of a
+    // bogus "everything changed" wake during the format upgrade.
+    if (!parsed.files || typeof parsed.files !== 'object') return null;
+    return parsed as PersistedState;
   } catch {
     return null;
   }
@@ -142,11 +163,34 @@ function writeState(statePath: string, state: VaultState): void {
   const payload: PersistedState = {
     hash: state.hash,
     fileCount: state.fileCount,
+    files: state.files,
     updatedAt: new Date().toISOString(),
   };
   const dir = path.dirname(statePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(statePath, JSON.stringify(payload, null, 2));
+}
+
+function diffFiles(
+  prev: Record<string, string>,
+  curr: Record<string, string>,
+): { added: string[]; removed: string[]; modified: string[] } {
+  const added: string[] = [];
+  const removed: string[] = [];
+  const modified: string[] = [];
+
+  for (const rel of Object.keys(curr)) {
+    if (!(rel in prev)) added.push(rel);
+    else if (prev[rel] !== curr[rel]) modified.push(rel);
+  }
+  for (const rel of Object.keys(prev)) {
+    if (!(rel in curr)) removed.push(rel);
+  }
+
+  added.sort();
+  removed.sort();
+  modified.sort();
+  return { added, removed, modified };
 }
 
 export function fsWatcherDecide(rootPath: string, statePath: string): FsWatcherDecision {
@@ -170,12 +214,16 @@ export function fsWatcherDecide(rootPath: string, statePath: string): FsWatcherD
   }
 
   writeState(statePath, current);
+  const { added, removed, modified } = diffFiles(prev.files, current.files);
   return {
     wakeAgent: true,
     data: {
       fileCount: current.fileCount,
       prevHash: prev.hash,
       currHash: current.hash,
+      added,
+      removed,
+      modified,
     },
   };
 }
