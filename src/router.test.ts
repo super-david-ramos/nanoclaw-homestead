@@ -476,3 +476,164 @@ describe('routeInbound — command gate', () => {
     expect(parsed.text).toContain('/clear');
   });
 });
+
+// ---------------------------------------------------------------------------
+// replyTo override — CLI admin transport redirects the agent's reply
+// ---------------------------------------------------------------------------
+
+describe('routeInbound — replyTo redirection', () => {
+  beforeEach(() => {
+    createAgentGroup({ id: 'ag-1', name: 'A', folder: 'a', agent_provider: null, created_at: now() });
+    createMessagingGroup({
+      id: 'mg-1',
+      channel_type: 'discord',
+      platform_id: 'chan-1',
+      name: 'General',
+      is_group: 1,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+    createMessagingGroupAgent({
+      id: 'mga-1',
+      messaging_group_id: 'mg-1',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+  });
+
+  it('writes the inbound row with reply-address from event.replyTo (overriding the source address)', async () => {
+    const { routeInbound } = await import('./router.js');
+    const { findSession } = await import('./db/sessions.js');
+    await routeInbound(
+      defaultEvent({
+        replyTo: { channelType: 'cli', platformId: 'admin-shell', threadId: null },
+        message: {
+          id: 'msg-redir',
+          kind: 'chat',
+          content: JSON.stringify({ text: 'inspect-state' }),
+          timestamp: now(),
+        },
+      }),
+    );
+    const session = findSession('mg-1', null);
+    expect(session).toBeDefined();
+    const { Database } = await import('bun:sqlite');
+    const { inboundDbPath } = await import('./session-manager.js');
+    const db = new Database(inboundDbPath('ag-1', session!.id), { readonly: true, strict: true });
+    const row = db
+      .prepare('SELECT channel_type, platform_id, thread_id FROM messages_in WHERE id LIKE ?')
+      .get('msg-redir%') as { channel_type: string; platform_id: string; thread_id: string | null };
+    db.close();
+    // Reply will go to cli/admin-shell, NOT discord/chan-1. The agent reads
+    // the inbound row's address verbatim and uses it as the reply target.
+    expect(row.channel_type).toBe('cli');
+    expect(row.platform_id).toBe('admin-shell');
+    expect(row.thread_id).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Setter overwrite warnings — log.warn on double-registration
+// ---------------------------------------------------------------------------
+
+describe('router setter idempotence', () => {
+  it('warns when a sender resolver is registered twice (likely a bug)', () => {
+    const warns: string[] = [];
+    const orig = log.warn;
+    log.warn = ((msg: string) => {
+      warns.push(msg);
+    }) as typeof log.warn;
+    try {
+      setSenderResolver(() => 'first');
+      setSenderResolver(() => 'second');
+      expect(warns.some((m) => m === 'Sender resolver overwritten')).toBe(true);
+    } finally {
+      log.warn = orig;
+    }
+  });
+
+  it('warns when an access gate is registered twice', () => {
+    const warns: string[] = [];
+    const orig = log.warn;
+    log.warn = ((msg: string) => {
+      warns.push(msg);
+    }) as typeof log.warn;
+    try {
+      setAccessGate(() => ({ allowed: true }));
+      setAccessGate(() => ({ allowed: true }));
+      expect(warns.some((m) => m === 'Access gate overwritten')).toBe(true);
+    } finally {
+      log.warn = orig;
+    }
+  });
+
+  it('warns when a sender-scope gate is registered twice', () => {
+    const warns: string[] = [];
+    const orig = log.warn;
+    log.warn = ((msg: string) => {
+      warns.push(msg);
+    }) as typeof log.warn;
+    try {
+      setSenderScopeGate(() => ({ allowed: true }));
+      setSenderScopeGate(() => ({ allowed: true }));
+      expect(warns.some((m) => m === 'Sender-scope gate overwritten')).toBe(true);
+    } finally {
+      log.warn = orig;
+    }
+  });
+
+  it('warns when a channel-request gate is registered twice', () => {
+    const warns: string[] = [];
+    const orig = log.warn;
+    log.warn = ((msg: string) => {
+      warns.push(msg);
+    }) as typeof log.warn;
+    try {
+      setChannelRequestGate(async () => undefined);
+      setChannelRequestGate(async () => undefined);
+      expect(warns.some((m) => m === 'Channel-request gate overwritten')).toBe(true);
+    } finally {
+      log.warn = orig;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateEngage default branch — unknown engage_mode → no engagement
+// ---------------------------------------------------------------------------
+
+describe('routeInbound — defensive default for unknown engage_mode', () => {
+  it('does not engage on an unknown engage_mode (defensive default — never fail-open on unrecognized config)', async () => {
+    createAgentGroup({ id: 'ag-1', name: 'A', folder: 'a', agent_provider: null, created_at: now() });
+    createMessagingGroup({
+      id: 'mg-1',
+      channel_type: 'discord',
+      platform_id: 'chan-1',
+      name: 'General',
+      is_group: 1,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+    // Bypass createMessagingGroupAgent typing so we can write a value the
+    // schema doesn't know about — this is the defensive default the router
+    // protects against (e.g., a half-applied migration leaving a row with
+    // engage_mode='future-mode').
+    getDb()
+      .prepare(
+        `INSERT INTO messaging_group_agents
+           (id, messaging_group_id, agent_group_id, engage_mode, engage_pattern, sender_scope, ignored_message_policy, session_mode, priority, created_at)
+           VALUES (@id, @mgid, @agid, @em, NULL, 'all', 'drop', 'shared', 0, @ca)`,
+      )
+      .run({ id: 'mga-x', mgid: 'mg-1', agid: 'ag-1', em: 'future-mode-not-yet-implemented', ca: now() });
+    const { routeInbound } = await import('./router.js');
+    await routeInbound(defaultEvent({ message: { ...defaultEvent().message, isMention: true } }));
+    const drop = getDb().prepare('SELECT reason FROM unregistered_senders').get() as { reason: string };
+    expect(drop.reason).toBe('no_agent_engaged');
+  });
+});
