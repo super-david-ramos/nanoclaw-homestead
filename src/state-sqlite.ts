@@ -50,9 +50,10 @@ export class SqliteStateAdapter implements StateAdapter {
   }
 
   async setIfNotExists(key: string, value: unknown, ttlMs?: number): Promise<boolean> {
-    const existing = this.db.prepare('SELECT expires_at FROM chat_sdk_kv WHERE key = ?').get(key) as
-      | { expires_at: number | null }
-      | undefined ?? undefined;
+    const existing =
+      (this.db.prepare('SELECT expires_at FROM chat_sdk_kv WHERE key = ?').get(key) as
+        | { expires_at: number | null }
+        | undefined) ?? undefined;
     if (existing?.expires_at && existing.expires_at < Date.now()) {
       this.db.prepare('DELETE FROM chat_sdk_kv WHERE key = ?').run(key);
     }
@@ -120,9 +121,10 @@ export class SqliteStateAdapter implements StateAdapter {
 
   async appendToList(key: string, value: unknown, options?: { maxLength?: number; ttlMs?: number }): Promise<void> {
     const expiresAt = options?.ttlMs ? Date.now() + options.ttlMs : null;
-    const maxRow = this.db.prepare('SELECT MAX(idx) as maxIdx FROM chat_sdk_lists WHERE key = ?').get(key) as
-      | { maxIdx: number | null }
-      | undefined ?? undefined;
+    const maxRow =
+      (this.db.prepare('SELECT MAX(idx) as maxIdx FROM chat_sdk_lists WHERE key = ?').get(key) as
+        | { maxIdx: number | null }
+        | undefined) ?? undefined;
     const nextIdx = (maxRow?.maxIdx ?? -1) + 1;
     this.db
       .prepare('INSERT INTO chat_sdk_lists (key, idx, value, expires_at) VALUES (?, ?, ?, ?)')

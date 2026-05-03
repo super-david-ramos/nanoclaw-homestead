@@ -404,9 +404,10 @@ async function maybeAttachVoiceReply(
     const text = typeof content.text === 'string' ? content.text.trim() : '';
     if (!text) return null;
 
-    const row = inDb.prepare('SELECT content FROM messages_in WHERE trigger = 1 ORDER BY seq DESC LIMIT 1').get() as
-      | { content: string }
-      | undefined ?? undefined;
+    const row =
+      (inDb.prepare('SELECT content FROM messages_in WHERE trigger = 1 ORDER BY seq DESC LIMIT 1').get() as
+        | { content: string }
+        | undefined) ?? undefined;
     if (!row) return null;
 
     let parsed: Record<string, unknown>;
@@ -458,11 +459,7 @@ export function registerDeliveryAction(action: string, handler: DeliveryActionHa
  * These are written to messages_out because the container can't write to inbound.db.
  * The host applies them to inbound.db here.
  */
-async function handleSystemAction(
-  content: Record<string, unknown>,
-  session: Session,
-  inDb: Database,
-): Promise<void> {
+async function handleSystemAction(content: Record<string, unknown>, session: Session, inDb: Database): Promise<void> {
   const action = content.action as string;
   log.info('System action from agent', { sessionId: session.id, action });
 

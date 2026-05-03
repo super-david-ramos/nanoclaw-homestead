@@ -1,25 +1,23 @@
 /**
  * Tests for the v2 channel adapter registry and integration with host.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import * as actualConfig from '../config.js';
 import { Database } from 'bun:sqlite';
 import fs from 'fs';
 
 import type { ChannelAdapter, ChannelSetup, InboundMessage, OutboundMessage } from './adapter.js';
 
 // Mock container runner
-vi.mock('../container-runner.js', () => ({
-  wakeContainer: vi.fn().mockResolvedValue(undefined),
-  isContainerRunning: vi.fn().mockReturnValue(false),
-  getActiveContainerCount: vi.fn().mockReturnValue(0),
-  killContainer: vi.fn(),
+mock.module('../container-runner.js', () => ({
+  wakeContainer: mock().mockResolvedValue(undefined),
+  isContainerRunning: mock().mockReturnValue(false),
+  getActiveContainerCount: mock().mockReturnValue(0),
+  killContainer: mock(),
 }));
 
 // Override DATA_DIR for tests
-vi.mock('../config.js', async () => {
-  const actual = await vi.importActual('../config.js');
-  return { ...actual, DATA_DIR: '/tmp/nanoclaw-test-channels' };
-});
+mock.module('../config.js', () => ({ ...actualConfig, DATA_DIR: '/tmp/nanoclaw-test-channels' }));
 
 const TEST_DIR = '/tmp/nanoclaw-test-channels';
 

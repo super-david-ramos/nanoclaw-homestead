@@ -4,3 +4,9 @@
 # must exist on the registry for at least this long before bun resolves them.
 minimumReleaseAge = 259200
 minimumReleaseAgeExcludes = []
+
+[test]
+# container/agent-runner/ is a separate bun package (own bun.lock, own
+# package.json) and runs `bun test` from its own directory in CI. Exclude
+# from the host test scan so its tests don't try to resolve host deps.
+pathIgnorePatterns = ["container/**"]

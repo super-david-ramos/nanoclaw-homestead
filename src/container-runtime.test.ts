@@ -1,19 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, mock, beforeEach } from 'bun:test';
 
 // Mock log
-vi.mock('./log.js', () => ({
+mock.module('./log.js', () => ({
   log: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    fatal: vi.fn(),
+    debug: mock(),
+    info: mock(),
+    warn: mock(),
+    error: mock(),
+    fatal: mock(),
   },
 }));
 
 // Mock child_process — store the mock fn so tests can configure it
-const mockExecSync = vi.fn();
-vi.mock('child_process', () => ({
+const mockExecSync = mock();
+mock.module('child_process', () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
 }));
 
@@ -28,7 +28,7 @@ import { CONTAINER_INSTALL_LABEL } from './config.js';
 import { log } from './log.js';
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  mock.clearAllMocks();
 });
 
 // --- Pure functions ---

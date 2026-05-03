@@ -13,18 +13,22 @@ export function createSession(session: Session): void {
 }
 
 export function getSession(id: string): Session | undefined {
-  return getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Session | undefined ?? undefined;
+  return (getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(id) as Session | undefined) ?? undefined;
 }
 
 export function findSession(messagingGroupId: string, threadId: string | null): Session | undefined {
   if (threadId) {
-    return getDb()
-      .prepare('SELECT * FROM sessions WHERE messaging_group_id = ? AND thread_id = ? AND status = ?')
-      .get(messagingGroupId, threadId, 'active') as Session | undefined ?? undefined;
+    return (
+      (getDb()
+        .prepare('SELECT * FROM sessions WHERE messaging_group_id = ? AND thread_id = ? AND status = ?')
+        .get(messagingGroupId, threadId, 'active') as Session | undefined) ?? undefined
+    );
   }
-  return getDb()
-    .prepare('SELECT * FROM sessions WHERE messaging_group_id = ? AND thread_id IS NULL AND status = ?')
-    .get(messagingGroupId, 'active') as Session | undefined ?? undefined;
+  return (
+    (getDb()
+      .prepare('SELECT * FROM sessions WHERE messaging_group_id = ? AND thread_id IS NULL AND status = ?')
+      .get(messagingGroupId, 'active') as Session | undefined) ?? undefined
+  );
 }
 
 /**
@@ -39,24 +43,30 @@ export function findSessionForAgent(
   threadId: string | null,
 ): Session | undefined {
   if (threadId) {
-    return getDb()
-      .prepare(
-        "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id = ? AND status = 'active'",
-      )
-      .get(agentGroupId, messagingGroupId, threadId) as Session | undefined ?? undefined;
+    return (
+      (getDb()
+        .prepare(
+          "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id = ? AND status = 'active'",
+        )
+        .get(agentGroupId, messagingGroupId, threadId) as Session | undefined) ?? undefined
+    );
   }
-  return getDb()
-    .prepare(
-      "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id IS NULL AND status = 'active'",
-    )
-    .get(agentGroupId, messagingGroupId) as Session | undefined ?? undefined;
+  return (
+    (getDb()
+      .prepare(
+        "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id IS NULL AND status = 'active'",
+      )
+      .get(agentGroupId, messagingGroupId) as Session | undefined) ?? undefined
+  );
 }
 
 /** Find an active session scoped to an agent group (ignoring messaging group). */
 export function findSessionByAgentGroup(agentGroupId: string): Session | undefined {
-  return getDb()
-    .prepare("SELECT * FROM sessions WHERE agent_group_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1")
-    .get(agentGroupId) as Session | undefined ?? undefined;
+  return (
+    (getDb()
+      .prepare("SELECT * FROM sessions WHERE agent_group_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1")
+      .get(agentGroupId) as Session | undefined) ?? undefined
+  );
 }
 
 export function getSessionsByAgentGroup(agentGroupId: string): Session[] {
@@ -124,9 +134,10 @@ export function createPendingQuestion(pq: PendingQuestion): boolean {
 }
 
 export function getPendingQuestion(questionId: string): PendingQuestion | undefined {
-  const row = getDb().prepare('SELECT * FROM pending_questions WHERE question_id = ?').get(questionId) as
-    | (Omit<PendingQuestion, 'options'> & { options_json: string })
-    | undefined ?? undefined;
+  const row =
+    (getDb().prepare('SELECT * FROM pending_questions WHERE question_id = ?').get(questionId) as
+      | (Omit<PendingQuestion, 'options'> & { options_json: string })
+      | undefined) ?? undefined;
   if (!row) return undefined ?? undefined;
   const { options_json, ...rest } = row;
   return { ...rest, options: JSON.parse(options_json) };
@@ -175,9 +186,11 @@ export function createPendingApproval(
 }
 
 export function getPendingApproval(approvalId: string): PendingApproval | undefined {
-  return getDb().prepare('SELECT * FROM pending_approvals WHERE approval_id = ?').get(approvalId) as
-    | PendingApproval
-    | undefined ?? undefined;
+  return (
+    (getDb().prepare('SELECT * FROM pending_approvals WHERE approval_id = ?').get(approvalId) as
+      | PendingApproval
+      | undefined) ?? undefined
+  );
 }
 
 export function updatePendingApprovalStatus(approvalId: string, status: PendingApproval['status']): void {
@@ -202,24 +215,27 @@ export function getAskQuestionRender(
 ): { title: string; options: import('../channels/ask-question.js').NormalizedOption[] } | undefined {
   const q = getPendingQuestion(id);
   if (q) return { title: q.title, options: q.options };
-  const a = getDb().prepare('SELECT title, options_json FROM pending_approvals WHERE approval_id = ?').get(id) as
-    | { title: string; options_json: string }
-    | undefined ?? undefined;
+  const a =
+    (getDb().prepare('SELECT title, options_json FROM pending_approvals WHERE approval_id = ?').get(id) as
+      | { title: string; options_json: string }
+      | undefined) ?? undefined;
   if (a?.title) return { title: a.title, options: JSON.parse(a.options_json) };
 
   // Channel-registration + unknown-sender approvals persist title/options_json
   // the same way pending_approvals does — just SELECT and return.
   if (hasTable(getDb(), 'pending_channel_approvals')) {
-    const c = getDb()
-      .prepare('SELECT title, options_json FROM pending_channel_approvals WHERE messaging_group_id = ?')
-      .get(id) as { title: string; options_json: string } | undefined ?? undefined;
+    const c =
+      (getDb()
+        .prepare('SELECT title, options_json FROM pending_channel_approvals WHERE messaging_group_id = ?')
+        .get(id) as { title: string; options_json: string } | undefined) ?? undefined;
     if (c?.title) return { title: c.title, options: JSON.parse(c.options_json) };
   }
 
   if (hasTable(getDb(), 'pending_sender_approvals')) {
-    const s = getDb().prepare('SELECT title, options_json FROM pending_sender_approvals WHERE id = ?').get(id) as
-      | { title: string; options_json: string }
-      | undefined ?? undefined;
+    const s =
+      (getDb().prepare('SELECT title, options_json FROM pending_sender_approvals WHERE id = ?').get(id) as
+        | { title: string; options_json: string }
+        | undefined) ?? undefined;
     if (s?.title) return { title: s.title, options: JSON.parse(s.options_json) };
   }
 

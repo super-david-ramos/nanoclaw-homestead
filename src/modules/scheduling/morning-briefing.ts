@@ -38,11 +38,12 @@ export function scheduleMorningBriefing(
   inDb: Database,
   opts: ScheduleMorningBriefingOpts,
 ): ScheduleMorningBriefingResult {
-  const existing = inDb
-    .prepare(
-      "SELECT id FROM messages_in WHERE series_id = ? AND kind = 'task' AND status IN ('pending','paused') ORDER BY seq DESC LIMIT 1",
-    )
-    .get(MORNING_BRIEFING_SERIES_ID) as { id: string } | undefined ?? undefined;
+  const existing =
+    (inDb
+      .prepare(
+        "SELECT id FROM messages_in WHERE series_id = ? AND kind = 'task' AND status IN ('pending','paused') ORDER BY seq DESC LIMIT 1",
+      )
+      .get(MORNING_BRIEFING_SERIES_ID) as { id: string } | undefined) ?? undefined;
 
   if (existing) {
     return { taskId: existing.id, created: false };

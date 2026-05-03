@@ -45,11 +45,12 @@ export interface ScheduleFsWatcherResult {
 }
 
 export function scheduleFsWatcher(inDb: Database, opts: ScheduleFsWatcherOpts): ScheduleFsWatcherResult {
-  const existing = inDb
-    .prepare(
-      "SELECT id FROM messages_in WHERE series_id = ? AND kind = 'task' AND status IN ('pending','paused') ORDER BY seq DESC LIMIT 1",
-    )
-    .get(FS_WATCHER_SERIES_ID) as { id: string } | undefined ?? undefined;
+  const existing =
+    (inDb
+      .prepare(
+        "SELECT id FROM messages_in WHERE series_id = ? AND kind = 'task' AND status IN ('pending','paused') ORDER BY seq DESC LIMIT 1",
+      )
+      .get(FS_WATCHER_SERIES_ID) as { id: string } | undefined) ?? undefined;
 
   if (existing) {
     return { taskId: existing.id, created: false };

@@ -6,7 +6,8 @@
 import { Database } from 'bun:sqlite';
 import fs from 'fs';
 import path from 'path';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mock , spyOn} from 'bun:test';
+import * as actualConfig from './config.js';
 
 import {
   initTestDb,
@@ -28,18 +29,15 @@ import { getSession, findSession } from './db/sessions.js';
 import type { InboundEvent } from './channels/adapter.js';
 
 // Mock container runner to prevent actual Docker spawning
-vi.mock('./container-runner.js', () => ({
-  wakeContainer: vi.fn().mockResolvedValue(undefined),
-  isContainerRunning: vi.fn().mockReturnValue(false),
-  getActiveContainerCount: vi.fn().mockReturnValue(0),
-  killContainer: vi.fn(),
+mock.module('./container-runner.js', () => ({
+  wakeContainer: mock().mockResolvedValue(undefined),
+  isContainerRunning: mock().mockReturnValue(false),
+  getActiveContainerCount: mock().mockReturnValue(0),
+  killContainer: mock(),
 }));
 
 // Override DATA_DIR for tests
-vi.mock('./config.js', async () => {
-  const actual = await vi.importActual('./config.js');
-  return { ...actual, DATA_DIR: '/tmp/nanoclaw-test-host' };
-});
+mock.module('./config.js', () => ({ ...actualConfig, DATA_DIR: '/tmp/nanoclaw-test-host' }));
 
 function now() {
   return new Date().toISOString();
@@ -317,7 +315,7 @@ describe('router', () => {
   it('fans out to every matching agent, each in its own session', async () => {
     const { routeInbound } = await import('./router.js');
     const { wakeContainer } = await import('./container-runner.js');
-    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
     // Wire a second agent to the same messaging group.
     createAgentGroup({
@@ -358,7 +356,7 @@ describe('router', () => {
   it('accumulates without waking when engage fails + ignored_message_policy=accumulate', async () => {
     const { routeInbound } = await import('./router.js');
     const { wakeContainer } = await import('./container-runner.js');
-    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
     // Replace the seed row with a mention-only wiring whose accumulate
     // policy should store context even when the message doesn't mention us.
@@ -397,7 +395,7 @@ describe('router', () => {
   it('drops silently when engage fails + ignored_message_policy=drop', async () => {
     const { routeInbound } = await import('./router.js');
     const { wakeContainer } = await import('./container-runner.js');
-    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
     const { updateMessagingGroupAgent } = await import('./db/messaging-groups.js');
     updateMessagingGroupAgent('mga-1', { engage_mode: 'mention' }); // drop is the default
@@ -468,7 +466,7 @@ describe('router engage_pattern', () => {
     wireAgentWithPattern('\\b[Bb]arnaby\\b');
     const { routeInbound } = await import('./router.js');
     const { wakeContainer } = await import('./container-runner.js');
-    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
     await routeInbound(inboundEvent('hi Barnaby, what time is it?'));
 
@@ -479,7 +477,7 @@ describe('router engage_pattern', () => {
     wireAgentWithPattern('\\b[Bb]arnaby\\b');
     const { routeInbound } = await import('./router.js');
     const { wakeContainer } = await import('./container-runner.js');
-    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
     await routeInbound(inboundEvent('hi'));
 
@@ -495,11 +493,11 @@ describe('router engage_pattern', () => {
     // having to re-derive the silent compile failure from chat behavior.
     wireAgentWithPattern('(?i)\\bbarnaby\\b');
     const { log } = await import('./log.js');
-    const warnSpy = vi.spyOn(log, 'warn').mockImplementation(() => undefined);
+    const warnSpy = spyOn(log, 'warn').mockImplementation(() => undefined);
     try {
       const { routeInbound } = await import('./router.js');
       const { wakeContainer } = await import('./container-runner.js');
-      (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+      (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
       await routeInbound(inboundEvent('hi'));
 

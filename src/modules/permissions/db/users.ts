@@ -22,7 +22,7 @@ export function upsertUser(user: User): void {
 }
 
 export function getUser(id: string): User | undefined {
-  return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined ?? undefined;
+  return (getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined) ?? undefined;
 }
 
 export function getAllUsers(): User[] {
@@ -44,9 +44,10 @@ export function deleteUser(id: string): void {
  * an audio response.
  */
 export function getUserPrefersVoice(id: string): boolean {
-  const row = getDb().prepare('SELECT prefers_voice_replies FROM users WHERE id = ?').get(id) as
-    | { prefers_voice_replies: number }
-    | undefined ?? undefined;
+  const row =
+    (getDb().prepare('SELECT prefers_voice_replies FROM users WHERE id = ?').get(id) as
+      | { prefers_voice_replies: number }
+      | undefined) ?? undefined;
   return row?.prefers_voice_replies === 1;
 }
 

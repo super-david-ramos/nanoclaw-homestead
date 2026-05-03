@@ -41,8 +41,9 @@ export function closeDb(): void {
  * or after that boundary.
  */
 export function hasTable(db: Database, name: string): boolean {
-  const row = db.prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1`).get(name) as
-    | { '1': number }
-    | undefined ?? undefined;
+  const row =
+    (db.prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1`).get(name) as
+      | { '1': number }
+      | undefined) ?? undefined;
   return row !== undefined;
 }

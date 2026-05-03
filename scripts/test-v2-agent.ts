@@ -4,7 +4,7 @@
  *
  * Usage: pnpm exec tsx scripts/test-v2-agent.ts
  */
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import fs from 'fs';
 
 const TEST_DIR = '/tmp/nanoclaw-v2-test';
@@ -15,8 +15,8 @@ if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true });
 fs.mkdirSync(TEST_DIR, { recursive: true });
 
 // Create session DB
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+const db = new Database(DB_PATH, { strict: true });
+db.run('PRAGMA journal_mode = WAL');
 db.exec(`
   CREATE TABLE messages_in (
     id TEXT PRIMARY KEY, kind TEXT NOT NULL, timestamp TEXT NOT NULL,
@@ -79,7 +79,7 @@ const resultChecker = setInterval(() => {
 }, 500);
 
 function printResults() {
-  const db2 = new Database(DB_PATH, { readonly: true });
+  const db2 = new Database(DB_PATH, { readonly: true, strict: true });
   const inRows = db2.prepare('SELECT * FROM messages_in').all() as Array<Record<string, unknown>>;
   const outRows = db2.prepare('SELECT * FROM messages_out').all() as Array<Record<string, unknown>>;
   console.log('\n--- messages_in ---');

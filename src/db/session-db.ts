@@ -140,9 +140,11 @@ export function getMessageForRetry(
   messageId: string,
   status: string,
 ): { id: string; tries: number; processAfter: string | null } | undefined {
-  return db
-    .prepare('SELECT id, tries, process_after as processAfter FROM messages_in WHERE id = ? AND status = ?')
-    .get(messageId, status) as { id: string; tries: number; processAfter: string | null } | undefined ?? undefined;
+  return (
+    (db
+      .prepare('SELECT id, tries, process_after as processAfter FROM messages_in WHERE id = ? AND status = ?')
+      .get(messageId, status) as { id: string; tries: number; processAfter: string | null } | undefined) ?? undefined
+  );
 }
 
 export function syncProcessingAcks(inDb: Database, outDb: Database): void {
@@ -194,12 +196,13 @@ export interface ContainerState {
  */
 export function getContainerState(outDb: Database): ContainerState | null {
   try {
-    const row = outDb
-      .prepare(
-        `SELECT current_tool, tool_declared_timeout_ms, tool_started_at
+    const row =
+      (outDb
+        .prepare(
+          `SELECT current_tool, tool_declared_timeout_ms, tool_started_at
            FROM container_state WHERE id = 1`,
-      )
-      .get() as ContainerState | undefined ?? undefined;
+        )
+        .get() as ContainerState | undefined) ?? undefined;
     return row ?? null;
   } catch {
     // Table not present on older session DBs — treat as "no tool in flight".

@@ -9,7 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 
 import { DATA_DIR } from '../src/config.js';
 import { readEnvFile } from '../src/env.js';
@@ -193,7 +193,7 @@ export async function run(_args: string[]): Promise<void> {
   const dbPath = path.join(DATA_DIR, 'v2.db');
   if (fs.existsSync(dbPath)) {
     try {
-      const db = new Database(dbPath, { readonly: true });
+      const db = new Database(dbPath, { readonly: true, strict: true });
       // Count agent groups that have at least one messaging group wired
       const row = db
         .prepare(

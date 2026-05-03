@@ -12,7 +12,8 @@
  *  - Deny path: pending row deleted, no member added
  */
 import fs from 'fs';
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, mock } from 'bun:test';
+import * as actualConfig from '../../config.js';
 
 import { initTestDb, closeDb, runMigrations } from '../../db/index.js';
 import { createAgentGroup } from '../../db/agent-groups.js';
@@ -21,16 +22,16 @@ import { upsertUser } from './db/users.js';
 import { grantRole } from './db/user-roles.js';
 
 // Mock container runner — prevent actual docker spawn.
-vi.mock('../../container-runner.js', () => ({
-  wakeContainer: vi.fn().mockResolvedValue(undefined),
-  isContainerRunning: vi.fn().mockReturnValue(false),
-  getActiveContainerCount: vi.fn().mockReturnValue(0),
-  killContainer: vi.fn(),
+mock.module('../../container-runner.js', () => ({
+  wakeContainer: mock().mockResolvedValue(undefined),
+  isContainerRunning: mock().mockReturnValue(false),
+  getActiveContainerCount: mock().mockReturnValue(0),
+  killContainer: mock(),
 }));
 
 // Mock delivery adapter — record card deliveries for assertions.
-const deliverMock = vi.fn().mockResolvedValue('plat-msg-id');
-vi.mock('../../delivery.js', () => ({
+const deliverMock = mock().mockResolvedValue('plat-msg-id');
+mock.module('../../delivery.js', () => ({
   getDeliveryAdapter: () => ({
     deliver: deliverMock,
   }),
@@ -38,8 +39,8 @@ vi.mock('../../delivery.js', () => ({
 
 // Mock ensureUserDm to return the approver's existing messaging group
 // instead of hitting a real openDM RPC.
-vi.mock('./user-dm.js', () => ({
-  ensureUserDm: vi.fn(async (userId: string) => {
+mock.module('./user-dm.js', () => ({
+  ensureUserDm: mock(async (userId: string) => {
     const { getDb } = await import('../../db/connection.js');
     const row = getDb()
       .prepare(
@@ -52,10 +53,7 @@ vi.mock('./user-dm.js', () => ({
   }),
 }));
 
-vi.mock('../../config.js', async () => {
-  const actual = await vi.importActual('../../config.js');
-  return { ...actual, DATA_DIR: '/tmp/nanoclaw-test-sender-approval' };
-});
+mock.module('../../config.js', () => ({ ...actualConfig, DATA_DIR: '/tmp/nanoclaw-test-sender-approval' }));
 
 const TEST_DIR = '/tmp/nanoclaw-test-sender-approval';
 
@@ -192,7 +190,7 @@ describe('unknown-sender request_approval flow', () => {
     const { routeInbound } = await import('../../router.js');
     const { getResponseHandlers } = await import('../../response-registry.js');
     const { wakeContainer } = await import('../../container-runner.js');
-    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
     await routeInbound(stranger('please let me in'));
     await new Promise((r) => setTimeout(r, 10));
@@ -259,7 +257,7 @@ describe('unknown-sender request_approval flow', () => {
     const member = getDb()
       .prepare('SELECT 1 AS x FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
       .get('tg:stranger', 'ag-1');
-    expect(member).toBeUndefined();
+    expect(member).toBeNull();
   });
 
   it('rejects clicks from an unauthorized user (prevents self-admit via forwarded card)', async () => {
@@ -293,7 +291,7 @@ describe('unknown-sender request_approval flow', () => {
     const member = getDb()
       .prepare('SELECT 1 AS x FROM agent_group_members WHERE user_id = ? AND agent_group_id = ?')
       .get('tg:stranger', 'ag-1');
-    expect(member).toBeUndefined();
+    expect(member).toBeNull();
 
     // Pending row is still there — a legitimate approver can still act on it.
     const stillPending = (getDb().prepare('SELECT COUNT(*) AS c FROM pending_sender_approvals').get() as { c: number })

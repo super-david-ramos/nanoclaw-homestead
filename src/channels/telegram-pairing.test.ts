@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-vi.mock('../log.js', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+mock.module('../log.js', () => ({ log: { info: mock(), warn: mock(), error: mock(), debug: mock() } }));
 
 import {
   createPairing,

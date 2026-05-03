@@ -6,7 +6,7 @@
  *
  * Usage: pnpm exec tsx scripts/test-v2-channel-e2e.ts
  */
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import fs from 'fs';
 import path from 'path';
 
@@ -205,7 +205,7 @@ await new Promise<void>((resolve) => {
       console.log(`\n✗ Timed out after ${TIMEOUT_MS / 1000}s`);
       // Check session DB directly
       try {
-        const db = new Database(sessDbPath, { readonly: true });
+        const db = new Database(sessDbPath, { readonly: true, strict: true });
         const out = db.prepare('SELECT * FROM messages_out').all();
         console.log(`  messages_out rows: ${out.length}`);
         if (out.length > 0) console.log('  (messages exist but delivery failed)');
@@ -229,7 +229,7 @@ console.log('\n\n=== Results ===');
 
 console.log('\nSession DB:');
 try {
-  const db = new Database(sessDbPath, { readonly: true });
+  const db = new Database(sessDbPath, { readonly: true, strict: true });
   const inRows = db.prepare('SELECT * FROM messages_in').all() as Array<Record<string, unknown>>;
   const outRows = db.prepare('SELECT * FROM messages_out').all() as Array<Record<string, unknown>>;
   db.close();

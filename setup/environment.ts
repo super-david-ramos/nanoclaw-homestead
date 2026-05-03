@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 
 import { log } from '../src/log.js';
 import { commandExists, getPlatform, isHeadless, isWSL } from './platform.js';
@@ -19,9 +19,9 @@ export function detectRegisteredGroups(projectRoot: string): boolean {
   const dbPath = path.join(projectRoot, 'data', 'v2.db');
   if (!fs.existsSync(dbPath)) return false;
 
-  let db: Database.Database | null = null;
+  let db: Database | null = null;
   try {
-    db = new Database(dbPath, { readonly: true });
+    db = new Database(dbPath, { readonly: true, strict: true });
     const row = db
       .prepare(
         `SELECT COUNT(DISTINCT ag.id) as count FROM agent_groups ag

@@ -42,9 +42,9 @@ for (const journalMode of ["DELETE", "WAL"]) {
   rmSync(dbPath + "-shm", { force: true });
   rmSync(dbPath + "-journal", { force: true });
 
-  const db = new Database(dbPath);
-  db.pragma(`journal_mode = ${journalMode}`);
-  db.pragma("synchronous = FULL");
+  const db = new Database(dbPath, { strict: true });
+  db.run(`PRAGMA journal_mode = ${journalMode}`);
+  db.run('PRAGMA synchronous = FULL');
   db.exec("CREATE TABLE msgs (seq INTEGER PRIMARY KEY, content TEXT)");
   db.close();
 
@@ -56,8 +56,8 @@ for (const journalMode of ["DELETE", "WAL"]) {
     "nanoclaw-agent:latest",
     "-e",
     `const Database = require('better-sqlite3');
-     const db = new Database('/workspace/live.db', { readonly: true });
-     db.pragma('busy_timeout = 2000');
+     const db = new Database('/workspace/live.db', { readonly: true, strict: true });
+     db.run('PRAGMA busy_timeout = 2000');
      const stmt = db.prepare('SELECT COUNT(*) as n, MAX(seq) as hi FROM msgs');
      let count = 0;
      const timer = setInterval(() => {
@@ -76,9 +76,9 @@ for (const journalMode of ["DELETE", "WAL"]) {
 
   // Host opens, writes, CLOSES each time (matches production session-manager pattern)
   for (let i = 1; i <= 8; i++) {
-    const h = new Database(dbPath);
-    h.pragma(`journal_mode = ${journalMode}`);
-    h.pragma("synchronous = FULL");
+    const h = new Database(dbPath, { strict: true });
+    h.run(`PRAGMA journal_mode = ${journalMode}`);
+    h.run("PRAGMA synchronous = FULL");
     h.prepare("INSERT INTO msgs (seq, content) VALUES (?, ?)").run(i, `msg-${i}`);
     h.close();
     console.log(`  [host] wrote+closed seq=${i} t=${Date.now() % 100000}`);

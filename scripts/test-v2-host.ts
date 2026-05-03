@@ -8,7 +8,7 @@
  *
  * Usage: pnpm exec tsx scripts/test-v2-host.ts
  */
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import fs from 'fs';
 import path from 'path';
 
@@ -109,7 +109,7 @@ const TIMEOUT_MS = 120_000;
 
 const checkForResponse = (): boolean => {
   try {
-    const db = new Database(outDbPath, { readonly: true });
+    const db = new Database(outDbPath, { readonly: true, strict: true });
     const out = db.prepare('SELECT * FROM messages_out').all() as Array<Record<string, unknown>>;
     db.close();
     return out.length > 0;
@@ -149,7 +149,7 @@ process.exit(0);
 
 function printState() {
   try {
-    const inDb = new Database(inDbPath, { readonly: true });
+    const inDb = new Database(inDbPath, { readonly: true, strict: true });
     const inRows = inDb.prepare('SELECT * FROM messages_in').all() as Array<Record<string, unknown>>;
     inDb.close();
 
@@ -162,7 +162,7 @@ function printState() {
   }
 
   try {
-    const outDb = new Database(outDbPath, { readonly: true });
+    const outDb = new Database(outDbPath, { readonly: true, strict: true });
     const outRows = outDb.prepare('SELECT * FROM messages_out').all() as Array<Record<string, unknown>>;
     const ackRows = outDb.prepare('SELECT * FROM processing_ack').all() as Array<Record<string, unknown>>;
     outDb.close();

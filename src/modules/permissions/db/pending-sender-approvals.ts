@@ -43,15 +43,18 @@ export function createPendingSenderApproval(row: PendingSenderApproval): void {
 }
 
 export function getPendingSenderApproval(id: string): PendingSenderApproval | undefined {
-  return getDb().prepare('SELECT * FROM pending_sender_approvals WHERE id = ?').get(id) as
-    | PendingSenderApproval
-    | undefined ?? undefined;
+  return (
+    (getDb().prepare('SELECT * FROM pending_sender_approvals WHERE id = ?').get(id) as
+      | PendingSenderApproval
+      | undefined) ?? undefined
+  );
 }
 
 export function hasInFlightSenderApproval(messagingGroupId: string, senderIdentity: string): boolean {
-  const row = getDb()
-    .prepare('SELECT 1 AS x FROM pending_sender_approvals WHERE messaging_group_id = ? AND sender_identity = ?')
-    .get(messagingGroupId, senderIdentity) as { x: number } | undefined ?? undefined;
+  const row =
+    (getDb()
+      .prepare('SELECT 1 AS x FROM pending_sender_approvals WHERE messaging_group_id = ? AND sender_identity = ?')
+      .get(messagingGroupId, senderIdentity) as { x: number } | undefined) ?? undefined;
   return row !== undefined;
 }
 

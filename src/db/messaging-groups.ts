@@ -28,13 +28,17 @@ export function createMessagingGroup(group: MessagingGroup): void {
 }
 
 export function getMessagingGroup(id: string): MessagingGroup | undefined {
-  return getDb().prepare('SELECT * FROM messaging_groups WHERE id = ?').get(id) as MessagingGroup | undefined ?? undefined;
+  return (
+    (getDb().prepare('SELECT * FROM messaging_groups WHERE id = ?').get(id) as MessagingGroup | undefined) ?? undefined
+  );
 }
 
 export function getMessagingGroupByPlatform(channelType: string, platformId: string): MessagingGroup | undefined {
-  return getDb()
-    .prepare('SELECT * FROM messaging_groups WHERE channel_type = ? AND platform_id = ?')
-    .get(channelType, platformId) as MessagingGroup | undefined ?? undefined;
+  return (
+    (getDb()
+      .prepare('SELECT * FROM messaging_groups WHERE channel_type = ? AND platform_id = ?')
+      .get(channelType, platformId) as MessagingGroup | undefined) ?? undefined
+  );
 }
 
 /**
@@ -54,15 +58,16 @@ export function getMessagingGroupWithAgentCount(
   channelType: string,
   platformId: string,
 ): { mg: MessagingGroup; agentCount: number } | null {
-  const row = getDb()
-    .prepare(
-      `SELECT mg.*, COUNT(mga.id) AS agent_count
+  const row =
+    (getDb()
+      .prepare(
+        `SELECT mg.*, COUNT(mga.id) AS agent_count
          FROM messaging_groups mg
     LEFT JOIN messaging_group_agents mga ON mga.messaging_group_id = mg.id
         WHERE mg.channel_type = ? AND mg.platform_id = ?
      GROUP BY mg.id`,
-    )
-    .get(channelType, platformId) as (MessagingGroup & { agent_count: number }) | undefined ?? undefined;
+      )
+      .get(channelType, platformId) as (MessagingGroup & { agent_count: number }) | undefined) ?? undefined;
   if (!row) return null;
   const { agent_count, ...mg } = row;
   return { mg: mg as MessagingGroup, agentCount: agent_count };
@@ -200,15 +205,18 @@ export function getMessagingGroupAgentByPair(
   messagingGroupId: string,
   agentGroupId: string,
 ): MessagingGroupAgent | undefined {
-  return getDb()
-    .prepare('SELECT * FROM messaging_group_agents WHERE messaging_group_id = ? AND agent_group_id = ?')
-    .get(messagingGroupId, agentGroupId) as MessagingGroupAgent | undefined ?? undefined;
+  return (
+    (getDb()
+      .prepare('SELECT * FROM messaging_group_agents WHERE messaging_group_id = ? AND agent_group_id = ?')
+      .get(messagingGroupId, agentGroupId) as MessagingGroupAgent | undefined) ?? undefined
+  );
 }
 
 export function getMessagingGroupAgent(id: string): MessagingGroupAgent | undefined {
-  return getDb().prepare('SELECT * FROM messaging_group_agents WHERE id = ?').get(id) as
-    | MessagingGroupAgent
-    | undefined ?? undefined;
+  return (
+    (getDb().prepare('SELECT * FROM messaging_group_agents WHERE id = ?').get(id) as MessagingGroupAgent | undefined) ??
+    undefined
+  );
 }
 
 export function updateMessagingGroupAgent(

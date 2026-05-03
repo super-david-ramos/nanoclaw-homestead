@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { attachVoiceTranscripts, type AttachmentLike } from './transcript-attach.js';
 
@@ -27,7 +27,7 @@ describe('attachVoiceTranscripts', () => {
   });
 
   it('skips non-audio attachments entirely', async () => {
-    const transcribe = vi.fn();
+    const transcribe = mock();
     const atts: AttachmentLike[] = [
       { mimeType: 'image/png', data: Buffer.from('img').toString('base64') },
       { mimeType: 'application/pdf', data: Buffer.from('pdf').toString('base64') },
@@ -39,7 +39,7 @@ describe('attachVoiceTranscripts', () => {
   });
 
   it('skips audio attachments that have no data', async () => {
-    const transcribe = vi.fn();
+    const transcribe = mock();
     const atts: AttachmentLike[] = [{ mimeType: 'audio/ogg' }];
     const out = await attachVoiceTranscripts(atts, { transcribe });
     expect(out).toEqual([]);
@@ -47,7 +47,7 @@ describe('attachVoiceTranscripts', () => {
   });
 
   it('transcribes audio attachments and mutates each entry with a transcript field', async () => {
-    const transcribe = vi.fn().mockResolvedValueOnce('first transcript').mockResolvedValueOnce('second transcript');
+    const transcribe = mock().mockResolvedValueOnce('first transcript').mockResolvedValueOnce('second transcript');
     const atts: AttachmentLike[] = [audioAttachment('audio/ogg', 'a'), audioAttachment('audio/wav', 'b')];
 
     const out = await attachVoiceTranscripts(atts, { transcribe, tmpDir: baseDir });
@@ -62,8 +62,7 @@ describe('attachVoiceTranscripts', () => {
   });
 
   it('continues past a failed transcription and reports a warning, not a throw', async () => {
-    const transcribe = vi
-      .fn()
+    const transcribe = mock()
       .mockRejectedValueOnce(new Error('whisper crashed'))
       .mockResolvedValueOnce('survivor transcript');
     const atts: AttachmentLike[] = [audioAttachment('audio/ogg', 'a'), audioAttachment('audio/ogg', 'b')];
@@ -77,7 +76,7 @@ describe('attachVoiceTranscripts', () => {
 
   it('cleans up the tmp file even when transcription throws', async () => {
     const observed: string[] = [];
-    const transcribe = vi.fn(async (opts: { path: string }) => {
+    const transcribe = mock(async (opts: { path: string }) => {
       observed.push(opts.path);
       writeFileSync(opts.path + '.canary', 'check');
       throw new Error('boom');

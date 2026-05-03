@@ -14,7 +14,8 @@
  *  - No agent groups configured: no card, no row
  */
 import fs from 'fs';
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, mock } from 'bun:test';
+import * as actualConfig from '../../config.js';
 
 import { initTestDb, closeDb, runMigrations } from '../../db/index.js';
 import { createAgentGroup } from '../../db/agent-groups.js';
@@ -23,23 +24,23 @@ import { upsertUser } from './db/users.js';
 import { grantRole } from './db/user-roles.js';
 
 // Mock container runner — prevent actual docker spawn.
-vi.mock('../../container-runner.js', () => ({
-  wakeContainer: vi.fn().mockResolvedValue(undefined),
-  isContainerRunning: vi.fn().mockReturnValue(false),
-  getActiveContainerCount: vi.fn().mockReturnValue(0),
-  killContainer: vi.fn(),
+mock.module('../../container-runner.js', () => ({
+  wakeContainer: mock().mockResolvedValue(undefined),
+  isContainerRunning: mock().mockReturnValue(false),
+  getActiveContainerCount: mock().mockReturnValue(0),
+  killContainer: mock(),
 }));
 
 // Mock delivery adapter.
-const deliverMock = vi.fn().mockResolvedValue('plat-msg-id');
-vi.mock('../../delivery.js', () => ({
+const deliverMock = mock().mockResolvedValue('plat-msg-id');
+mock.module('../../delivery.js', () => ({
   getDeliveryAdapter: () => ({ deliver: deliverMock }),
 }));
 
 // Mock ensureUserDm — look up the owner's preconfigured DM row instead of
 // hitting a real openDM RPC.
-vi.mock('./user-dm.js', () => ({
-  ensureUserDm: vi.fn(async (userId: string) => {
+mock.module('./user-dm.js', () => ({
+  ensureUserDm: mock(async (userId: string) => {
     const { getDb } = await import('../../db/connection.js');
     const row = getDb()
       .prepare(
@@ -52,10 +53,7 @@ vi.mock('./user-dm.js', () => ({
   }),
 }));
 
-vi.mock('../../config.js', async () => {
-  const actual = await vi.importActual('../../config.js');
-  return { ...actual, DATA_DIR: '/tmp/nanoclaw-test-channel-approval' };
-});
+mock.module('../../config.js', () => ({ ...actualConfig, DATA_DIR: '/tmp/nanoclaw-test-channel-approval' }));
 
 const TEST_DIR = '/tmp/nanoclaw-test-channel-approval';
 
@@ -191,7 +189,7 @@ describe('unknown-channel registration flow', () => {
     const { routeInbound } = await import('../../router.js');
     const { getResponseHandlers } = await import('../../response-registry.js');
     const { wakeContainer } = await import('../../container-runner.js');
-    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+    (wakeContainer as unknown as ReturnType<typeof mock>).mockClear();
 
     await routeInbound(groupMention('chat-approve'));
     await new Promise((r) => setTimeout(r, 10));

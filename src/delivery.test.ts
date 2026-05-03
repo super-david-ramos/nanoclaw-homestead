@@ -10,19 +10,17 @@
  */
 import { Database } from 'bun:sqlite';
 import fs from 'fs';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import * as actualConfig from './config.js';
 
-vi.mock('./container-runner.js', () => ({
-  wakeContainer: vi.fn().mockResolvedValue(undefined),
-  isContainerRunning: vi.fn().mockReturnValue(false),
-  killContainer: vi.fn(),
-  buildAgentGroupImage: vi.fn().mockResolvedValue(undefined),
+mock.module('./container-runner.js', () => ({
+  wakeContainer: mock().mockResolvedValue(undefined),
+  isContainerRunning: mock().mockReturnValue(false),
+  killContainer: mock(),
+  buildAgentGroupImage: mock().mockResolvedValue(undefined),
 }));
 
-vi.mock('./config.js', async () => {
-  const actual = await vi.importActual<typeof import('./config.js')>('./config.js');
-  return { ...actual, DATA_DIR: '/tmp/nanoclaw-test-delivery' };
-});
+mock.module('./config.js', () => ({ ...actualConfig, DATA_DIR: '/tmp/nanoclaw-test-delivery' }));
 
 const TEST_DIR = '/tmp/nanoclaw-test-delivery';
 
