@@ -106,6 +106,17 @@ export function getNodePath(): string {
   }
 }
 
+export function getBunPath(): string {
+  try {
+    return execSync('command -v bun', { encoding: 'utf-8' }).trim();
+  } catch {
+    // The host runtime is Bun since the 2026-05-03 migration. If bun isn't
+    // on PATH at setup time fall back to the standard Homebrew location —
+    // the launchd plist + bundle wrapper both need a concrete absolute path.
+    return '/opt/homebrew/bin/bun';
+  }
+}
+
 export function commandExists(name: string): boolean {
   try {
     execSync(`command -v ${name}`, { stdio: 'ignore' });

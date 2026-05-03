@@ -646,7 +646,9 @@ describe('routeInbound — defensive default for unknown engage_mode', () => {
 // scoped (set via a closure variable so individual tests can vary it).
 // ---------------------------------------------------------------------------
 
-let mockedAdapter: { name: string; channelType: string; supportsThreads: boolean; subscribe?: () => Promise<void> } | undefined;
+let mockedAdapter:
+  | { name: string; channelType: string; supportsThreads: boolean; subscribe?: () => Promise<void> }
+  | undefined;
 
 // Pre-import to avoid the async-mock-factory deadlock pattern (an async
 // factory that does `await import('./channels/channel-registry.js')`
@@ -750,7 +752,11 @@ describe('routeInbound — deliverToAgent session-mode resolution', () => {
     const { routeInbound } = await import('./router.js');
     const { findSession } = await import('./db/sessions.js');
     await routeInbound(
-      defaultEvent({ platformId: 'chan-grp', threadId: 'thr-A', message: { ...defaultEvent().message, isMention: true } }),
+      defaultEvent({
+        platformId: 'chan-grp',
+        threadId: 'thr-A',
+        message: { ...defaultEvent().message, isMention: true },
+      }),
     );
     await routeInbound(
       defaultEvent({
@@ -795,7 +801,11 @@ describe('routeInbound — deliverToAgent session-mode resolution', () => {
     // same shared session because is_group=0 short-circuits the per-thread
     // override.
     await routeInbound(
-      defaultEvent({ platformId: 'dm-target', threadId: 'thr-X', message: { ...defaultEvent().message, isMention: true } }),
+      defaultEvent({
+        platformId: 'dm-target',
+        threadId: 'thr-X',
+        message: { ...defaultEvent().message, isMention: true },
+      }),
     );
     await routeInbound(
       defaultEvent({
