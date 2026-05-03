@@ -51,24 +51,24 @@ See [expected.md](expected.md) for the line-level expectations.
   4. State already advanced → wakeAgent:false
   5. mtime-only "iCloud touch" → wakeAgent:false (content-hash, not mtime)
 
-- **Section 3** — live container smoke. Confirms vault-hash.ts is
-  bind-mounted into the running family container (it lives under
-  `container/agent-runner/src/scripts/`, mounted at `/app/src/scripts/`),
-  and runs cleanly. If the iCloud mount has not taken effect on the running
-  container yet (e.g. it was spawned before the `container.json` edit), the
-  output is `vaultMissing:true` — that is the *correct* soft-fail behavior
-  and not a bug. Next container respawn will pick up the mount.
+- **Section 3** — fresh-container exercise against the checked-in fixture
+  vault at `tests/fixtures/vault/`. Spawns a short-lived `--rm` container
+  per tick, bind-mounts the fixture (read-only) and a `/tmp` scratch dir
+  (writable for the state file), and walks through five ticks: firstRun
+  baseline → no-change quiet → modified-file diff → added-file diff →
+  removed-file diff. Each assertion grep-matches the expected JSON shape;
+  the demo exits non-zero on the first failure.
 
-## Triggering the next respawn
+  **The household's real iCloud-synced Obsidian vault is never touched.**
+  The original demo used `docker exec` against the live family container;
+  the rewrite avoids that so the demo is reproducible from a clean clone
+  and doesn't depend on the family container being running.
 
-The fs-watcher fires every 15 minutes (cron `*/15 * * * *`). Once the family
-container respawns with the iCloud mount active, the next tick will record
-the real baseline (firstRun:true) and subsequent ticks will detect Obsidian
-edits.
+## Live family-agent verification (separate from this demo)
 
-To force a respawn:
-- Send any message in the wired Telegram chat — the host will pick up a new
-  session and spawn a fresh container.
-- Or restart the host service: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`.
-- Or kill the container directly: `docker rm -f nanoclaw-v2-family-<id>`. The
-  next due message will trigger respawn within 60s (sweep tick).
+The demo proves the *machinery* works against a fixture vault. To confirm
+the live family agent is producing useful chat messages, edit a real note
+in your Obsidian vault and watch for Barnaby's response in the family chat
+within 15 minutes. The fs-watcher schedule_task on the live family session
+fires every quarter hour; on a content change it surfaces the diff to
+Barnaby with read access to the vault, and he posts a short note.
