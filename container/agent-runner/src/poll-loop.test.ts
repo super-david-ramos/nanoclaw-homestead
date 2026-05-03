@@ -5,6 +5,8 @@ import { getPendingMessages, markCompleted } from './db/messages-in.js';
 import { getUndeliveredMessages } from './db/messages-out.js';
 import { formatMessages, extractRouting } from './formatter.js';
 import { MockProvider } from './providers/mock.js';
+import { processFollowUpMessages } from './poll-loop.js';
+import type { AgentQuery, ProviderEvent } from './providers/types.js';
 
 beforeEach(() => {
   initTestSessionDb();
@@ -244,5 +246,184 @@ describe('end-to-end with mock provider', () => {
     expect(outMessages).toHaveLength(1);
     expect(JSON.parse(outMessages[0].content).text).toBe('The answer is 4');
     expect(outMessages[0].in_reply_to).toBe('m1');
+  });
+});
+
+// ----------------------------------------------------------------------------
+// processFollowUpMessages — the active-query follow-up gate.
+//
+// Regression-driven: in the Phase 2 fs-watcher live test (2026-05-02), the
+// agent's first task fired correctly with the script's diff data, but the
+// poll-loop's `setInterval` then kept finding new pending fs-watcher rows
+// (recurrences) and pushed them as raw `formatMessages(...)` follow-ups
+// without applying pre-task scripts. The agent correctly responded "no
+// scriptOutput data — staying silent" to each of those, polluting the active
+// query and burning tokens on every recurrence tick. Mirror the initial
+// batch's gate: scripts run, wakeAgent=false rows skip-without-pushing.
+// ----------------------------------------------------------------------------
+
+interface RecordingQuery extends AgentQuery {
+  pushed: string[];
+}
+
+function recordingQuery(): RecordingQuery {
+  const pushed: string[] = [];
+  return {
+    pushed,
+    push(message: string) {
+      pushed.push(message);
+    },
+    end() {},
+    abort() {},
+    events: (async function* (): AsyncIterable<ProviderEvent> {})(),
+  };
+}
+
+const noopLog = (_msg: string) => {};
+
+describe('processFollowUpMessages', () => {
+  it('regression: a wakeAgent=false task is NOT pushed and is marked completed', async () => {
+    // The original bug: this row was pushed as a raw follow-up, the agent
+    // saw a prompt with no scriptOutput, and replied "no script output data
+    // — staying silent." Forever, in a loop, until the host killed the
+    // container.
+    insertMessage('t-skip', 'task', {
+      prompt: 'should not reach the agent',
+      script: `echo '{"wakeAgent":false}'`,
+    });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(0);
+    expect(getPendingMessages()).toHaveLength(0);
+  });
+
+  it('a wakeAgent=true task is pushed exactly once with scriptOutput merged into content', async () => {
+    insertMessage('t-wake', 'task', {
+      prompt: 'real briefing',
+      script: `echo '{"wakeAgent":true,"data":{"diff":"x"}}'`,
+    });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(1);
+    expect(query.pushed[0]).toContain('real briefing');
+    // The script's data must reach the agent — that's the whole point of
+    // the gate. Without this assertion, regression #1 could re-appear in a
+    // different shape (script ran but output got stripped before push).
+    expect(query.pushed[0]).toContain('"diff":"x"');
+    expect(getPendingMessages()).toHaveLength(0);
+  });
+
+  it('a non-task chat message is pushed unchanged (no script gate applies)', async () => {
+    insertMessage('c1', 'chat', { sender: 'Alice', text: 'hello' });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(1);
+    expect(query.pushed[0]).toContain('Alice');
+    expect(query.pushed[0]).toContain('hello');
+    expect(getPendingMessages()).toHaveLength(0);
+  });
+
+  it('mixed batch — wake task + skip task + chat — pushes only the wake task and the chat', async () => {
+    insertMessage('t-wake', 'task', {
+      prompt: 'wake-prompt',
+      script: `echo '{"wakeAgent":true,"data":{}}'`,
+    });
+    insertMessage('t-skip', 'task', {
+      prompt: 'skip-prompt',
+      script: `echo '{"wakeAgent":false}'`,
+    });
+    insertMessage('c1', 'chat', { sender: 'Bob', text: 'pushed' });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(1);
+    const pushed = query.pushed[0];
+    expect(pushed).toContain('wake-prompt');
+    expect(pushed).toContain('Bob');
+    expect(pushed).toContain('pushed');
+    expect(pushed).not.toContain('skip-prompt');
+
+    // Both the wake and the skip should be marked completed; chat too.
+    expect(getPendingMessages()).toHaveLength(0);
+  });
+
+  it('script error or invalid output is treated as wakeAgent=false (skipped, no push)', async () => {
+    insertMessage('t-broken', 'task', {
+      prompt: 'broken-script',
+      script: `echo 'not json'`,
+    });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(0);
+    expect(getPendingMessages()).toHaveLength(0);
+  });
+
+  it('system messages are filtered out — left pending, not pushed (existing follow-up filter is preserved)', async () => {
+    // System messages are MCP tool responses — they go back to the active
+    // query through the SDK's own channel, not through messages_in. The
+    // active-poll loop must not touch them.
+    insertMessage('s1', 'system', { text: 'tool result' });
+    insertMessage('c1', 'chat', { sender: 'Alice', text: 'real chat' });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(1);
+    expect(query.pushed[0]).toContain('real chat');
+    expect(query.pushed[0]).not.toContain('tool result');
+
+    // The system message is still pending — the gate doesn't touch it.
+    const stillPending = getPendingMessages();
+    expect(stillPending.map((m) => m.id)).toContain('s1');
+    expect(stillPending.map((m) => m.id)).not.toContain('c1');
+  });
+
+  it('clear-command chat messages are filtered out — left pending for the next initial batch', async () => {
+    // Clear commands need to reset the continuation; that's a top-level
+    // poll-loop concern, not a follow-up push concern.
+    insertMessage('c-clear', 'chat', { sender: 'Alice', text: '/clear' });
+    insertMessage('c-real', 'chat', { sender: 'Bob', text: 'normal' });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(1);
+    expect(query.pushed[0]).toContain('normal');
+    expect(query.pushed[0]).not.toContain('/clear');
+
+    const stillPending = getPendingMessages();
+    expect(stillPending.map((m) => m.id)).toContain('c-clear');
+  });
+
+  it('empty pending queue is a no-op — no push, no error', async () => {
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+    expect(query.pushed).toHaveLength(0);
+  });
+
+  it('all-skipped batch produces no push (everything got gated)', async () => {
+    insertMessage('t-skip-1', 'task', {
+      prompt: 'skip me',
+      script: `echo '{"wakeAgent":false}'`,
+    });
+    insertMessage('t-skip-2', 'task', {
+      prompt: 'skip me too',
+      script: `echo '{"wakeAgent":false}'`,
+    });
+
+    const query = recordingQuery();
+    await processFollowUpMessages(query, noopLog);
+
+    expect(query.pushed).toHaveLength(0);
+    expect(getPendingMessages()).toHaveLength(0);
   });
 });
