@@ -85,7 +85,7 @@ Trunk does not ship any specific channel adapter or non-default agent provider. 
 - **`channels` branch** — Discord, Slack, Telegram, WhatsApp, Teams, Linear, GitHub, iMessage, Webex, Resend, Matrix, Google Chat, WhatsApp Cloud (+ helpers, tests, channel-specific setup steps). Installed via `/add-<channel>` skills.
 - **`providers` branch** — OpenCode (and any future non-default agent providers). Installed via `/add-opencode`.
 
-Each `/add-<name>` skill is idempotent: `git fetch origin <branch>` → copy module(s) into the standard paths → append a self-registration import to the relevant barrel → `pnpm install <pkg>@<pinned-version>` → build.
+Each `/add-<name>` skill is idempotent: `git fetch origin <branch>` → copy module(s) into the standard paths → append a self-registration import to the relevant barrel → `bun add <pkg>@<pinned-version>` → build.
 
 ## Self-Modification
 
@@ -162,18 +162,18 @@ Before creating a PR, adding a skill, or preparing any contribution, you MUST re
 Run commands directly — don't tell the user to run them.
 
 ```bash
-# Host (Node + pnpm)
-pnpm run dev          # Host with hot reload
-pnpm run build        # Compile host TypeScript (src/)
+# Host (Bun — see docs/plan/phases/phase-bun-migration.md for the Node→Bun migration)
+bun run dev           # Host with hot reload (bun --watch run src/index.ts)
+bun run typecheck     # tsc --noEmit (bun doesn't typecheck on its own)
 ./container/build.sh  # Rebuild agent container image (nanoclaw-agent:latest)
-pnpm test             # Host tests (vitest)
+bun test --isolate    # Host tests (bun:test); --isolate gives per-file mock scoping
 
-# Agent-runner (Bun — separate package tree under container/agent-runner/)
+# Agent-runner (also Bun — separate package tree under container/agent-runner/)
 cd container/agent-runner && bun install   # After editing agent-runner deps
 cd container/agent-runner && bun test      # Container tests (bun:test)
 ```
 
-Container typecheck is a separate tsconfig — if you edit `container/agent-runner/src/`, run `pnpm exec tsc -p container/agent-runner/tsconfig.json --noEmit` from root (or `bun run typecheck` from `container/agent-runner/`).
+Container typecheck is a separate tsconfig — if you edit `container/agent-runner/src/`, run `bunx tsc -p container/agent-runner/tsconfig.json --noEmit` from root (or `bun run typecheck` from `container/agent-runner/`).
 
 Service management:
 ```bash
@@ -188,14 +188,14 @@ systemctl --user start|stop|restart nanoclaw
 
 Host logs: `logs/nanoclaw.log` (normal) and `logs/nanoclaw.error.log` (errors only — some delivery/approval failures only show up here).
 
-## Supply Chain Security (pnpm)
+## Supply Chain Security
 
-This project uses pnpm with `minimumReleaseAge: 4320` (3 days) in `pnpm-workspace.yaml`. New package versions must exist on the npm registry for 3 days before pnpm will resolve them.
+This project uses Bun with `install.minimumReleaseAge = 259200` (3 days) in `bunfig.toml`. New package versions must exist on the npm registry for 3 days before Bun will resolve them. Same intent and gate as the prior pnpm `minimumReleaseAge: 4320` (pnpm used minutes; bun uses seconds).
 
 **Rules — do not bypass without explicit human approval:**
-- **`minimumReleaseAgeExclude`**: Never add entries without human sign-off. If a package must bypass the release age gate, the human must approve and the entry must pin the exact version being excluded (e.g. `package@1.2.3`), never a range.
-- **`onlyBuiltDependencies`**: Never add packages to this list without human approval — build scripts execute arbitrary code during install.
-- **`pnpm install --frozen-lockfile`** should be used in CI, automation, and container builds. Never run bare `pnpm install` in those contexts.
+- **`minimumReleaseAgeExcludes`** (in `bunfig.toml`): Never add entries without human sign-off. If a package must bypass the release age gate, the human must approve and the entry must pin the exact version being excluded (e.g. `package@1.2.3`), never a range.
+- **`trustedDependencies`** (in `package.json`): Never add packages to this list without human approval — postinstall scripts execute arbitrary code during install. (Same intent as the prior pnpm `onlyBuiltDependencies` allowlist.)
+- **`bun install --frozen-lockfile`** should be used in CI, automation, and container builds. Never run bare `bun install` in those contexts.
 
 ## Docs Index
 
@@ -216,19 +216,27 @@ This project uses pnpm with `minimumReleaseAge: 4320` (3 days) in `pnpm-workspac
 
 The container buildkit caches the build context aggressively. `--no-cache` alone does NOT invalidate COPY steps — the builder's volume retains stale files. To force a truly clean rebuild, prune the builder then re-run `./container/build.sh`.
 
-## Container Runtime (Bun)
+## Runtime: Bun (host + container)
 
-The agent container runs on **Bun**; the host runs on **Node** (pnpm). They communicate only via session DBs — no shared modules. Details and rationale: [docs/build-and-runtime.md](docs/build-and-runtime.md).
+Both the host and the agent container now run on **Bun**. They communicate only via session DBs — no shared modules. Two separate Bun trees:
+
+- **Host** (`/`, `src/`, `setup/`, `scripts/`): own `package.json` + `bun.lock` + `bunfig.toml` (which carries `install.minimumReleaseAge` and `pathIgnorePatterns = ["container/**"]`).
+- **Agent-runner** (`container/agent-runner/`): own `package.json` + `bun.lock`. Not part of the host's Bun workspace.
+
+The host migration replaced Node + pnpm + vitest + tsx with Bun + bun:test. Background and trade-offs: [docs/plan/phases/phase-bun-migration.md](docs/plan/phases/phase-bun-migration.md). Container-side migration history: [docs/build-and-runtime.md](docs/build-and-runtime.md).
 
 **Gotchas — trigger + action:**
 
-- **Adding or bumping a runtime dep in `container/agent-runner/`** → edit `package.json`, then `cd container/agent-runner && bun install` and commit the updated `bun.lock`. Do not run `pnpm install` there — agent-runner is not a pnpm workspace.
-- **Bumping `@anthropic-ai/claude-agent-sdk`, `@modelcontextprotocol/sdk`, or any agent-runner runtime dep** → no `minimumReleaseAge` policy applies to this tree. Check the release date on npm, pin deliberately, never `bun update` blindly.
-- **Writing a new named-param SQL insert/update in the container** → use `$name` in both SQL and JS keys: `.run({ $id: msg.id })`. `bun:sqlite` does not auto-strip the prefix the way `better-sqlite3` does on the host. Positional `?` params work normally.
-- **Adding a test in `container/agent-runner/src/`** → import from `bun:test`, not `vitest`. Vitest runs on Node and can't load `bun:sqlite`. `vitest.config.ts` excludes this tree.
-- **Adding a Node CLI the agent invokes at runtime** (like `agent-browser`, `claude-code`, `vercel`) → put it in the Dockerfile's pnpm global-install block, pinned to an exact version via a new `ARG`. Don't use `bun install -g` — that bypasses the pnpm supply-chain policy.
+- **Adding or bumping a runtime dep in `container/agent-runner/`** → edit `package.json`, then `cd container/agent-runner && bun install` and commit the updated `bun.lock`. agent-runner has its own bun tree separate from the host.
+- **Adding or bumping a runtime dep in the host (root)** → edit `package.json`, then `bun install` from root. The `install.minimumReleaseAge = 259200` in `bunfig.toml` blocks resolution of versions less than 3 days old. Use `--frozen-lockfile` in CI.
+- **Bumping `@anthropic-ai/claude-agent-sdk`, `@modelcontextprotocol/sdk`, or any agent-runner runtime dep** → no `minimumReleaseAge` policy applies to the container tree. Check the release date on npm, pin deliberately, never `bun update` blindly.
+- **Writing a new named-param SQL insert/update in the host** → use `@name` in SQL and bare `name` JS keys: `.run({ id: msg.id })`. The host opens DBs with `{ strict: true }` which lets bun:sqlite accept bare keys (matching the prior better-sqlite3 default behavior).
+- **Writing a new named-param SQL insert/update in the container** → use `$name` in both SQL and JS keys: `.run({ $id: msg.id })`. The container opens DBs WITHOUT `strict: true`, so `bun:sqlite` requires the prefix on JS keys. Positional `?` params work in both.
+- **`.get(...)` returns `null` (not `undefined`) when no row matches under bun:sqlite** — the host's `T | undefined` getter contract is preserved by appending `?? undefined` at every call site. New getters that return `T | undefined` must do the same.
+- **Adding a test anywhere** → import from `bun:test`. Host tests run with `--isolate` (each test file in a fresh global) so `mock.module` registrations don't leak across files. Without `--isolate` you'll see tests pass alone and fail together.
+- **Adding a Node CLI the agent invokes at runtime** (like `agent-browser`, `claude-code`, `vercel`) → put it in the Dockerfile's pnpm global-install block (the container image still uses pnpm for its own install layer), pinned to an exact version via a new `ARG`. Don't use `bun install -g` — that bypasses the pnpm supply-chain policy in the container.
 - **Changing the Dockerfile entrypoint or the dynamic-spawn command** (`src/container-runner.ts` line ~301) → keep `exec bun ...` so signals forward cleanly. The image has no `/app/dist`; don't reintroduce a tsc build step.
-- **Changing session-DB pragmas** (`container/agent-runner/src/db/connection.ts`) → `journal_mode=DELETE` is load-bearing for cross-mount visibility. Read the comment block at the top of the file first.
+- **Changing session-DB pragmas** (`container/agent-runner/src/db/connection.ts` and `src/db/session-db.ts`) → `journal_mode=DELETE` is load-bearing for cross-mount visibility. Read the comment block at the top of the container file first. Both ends now use bun:sqlite, so the cross-mount story is library-symmetric.
 
 ## CJK font support
 

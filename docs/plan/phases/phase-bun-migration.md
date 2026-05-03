@@ -164,9 +164,46 @@ DB surgery (T-B.2) first: it's the largest unknown, most test-blocking, and an e
 
 ## Phase done = all of
 
-- [ ] T-B.1 through T-B.10 (port-and-validate per file)
-- [ ] `bun test` green (full host + container suites)
-- [ ] Host running on bun via launchd, ≥1 round-trip message verified
-- [ ] No `vitest`, `tsx`, `better-sqlite3`, `pnpm-*` in host package tree
-- [ ] CLAUDE.md and docs reflect bun-on-host
-- [ ] Completion report filed
+- [x] T-B.1 — bunfig + trustedDependencies + bun version pin (commits e19c5fb, 39fd36e)
+- [x] T-B.2 — host DB layer better-sqlite3 → bun:sqlite (commit b8ba04b)
+- [x] T-B.3 — vi → bun:test mock translation (commit 70d8025)
+- [x] T-B.4 — test runner switch to bun:test --isolate (commit 70d8025)
+- [x] T-B.5 — drop tsc build + tsx + vitest, swap scripts to bun (commit 1bfc302)
+- [x] T-B.6 — runtime smoke against snapshot DB (verified, no commit; described in T-B.7 commit body 41d3525)
+- [x] T-B.7 — CI workflow update (commit 41d3525)
+- [x] T-B.8 — launchd plist switchover (live service now `bun run src/index.ts`; plist backup at `~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist.pre-bun-backup`)
+- [x] T-B.9 — cleanup (pnpm-lock.yaml + pnpm-workspace.yaml + dist/ deleted) + docs (CLAUDE.md + docs/build-and-runtime.md updated)
+- [ ] T-B.10 — demo + completion report
+- [x] `bun test --isolate` green: 288 pass / 0 fail / 0 errors across 34 files
+- [x] Host running on bun via launchd (PID checked at cutover, stable)
+- [x] No `vitest`, `tsx`, `better-sqlite3`, `pnpm-*` in host package tree
+- [x] CLAUDE.md and docs/build-and-runtime.md reflect bun-on-host
+- [ ] Completion report filed (T-B.10)
+
+## Rollback recipe
+
+If anything breaks post-cutover, restore the prior Node-based service in <2min:
+
+```bash
+# 1. Stop the bun-based service
+launchctl unload ~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist
+
+# 2. Restore the pre-bun plist (kept as a sibling backup)
+cp ~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist.pre-bun-backup \
+   ~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist
+
+# 3. Switch checkout back to main
+cd /Users/dr/Code/nanoclaw-homestead
+git checkout main
+
+# 4. Restore pnpm tree
+pnpm install --frozen-lockfile
+
+# 5. Rebuild the dist/ the old plist points at
+pnpm run build
+
+# 6. Restart service
+launchctl load ~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist
+```
+
+Important: the pre-bun plist points at `dist/index.js`, which is gitignored. After T-B.9 deleted dist/, the rollback requires step 5 (`pnpm run build`) — which in turn requires `pnpm` and the old `pnpm-lock.yaml` to still exist in git history (they do; they were tracked under main and only deleted on this branch).
