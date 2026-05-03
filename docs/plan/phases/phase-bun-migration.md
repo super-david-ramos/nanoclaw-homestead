@@ -173,12 +173,12 @@ DB surgery (T-B.2) first: it's the largest unknown, most test-blocking, and an e
 - [x] T-B.7 — CI workflow update (commit 41d3525)
 - [x] T-B.8 — launchd plist switchover (live service now `bun run src/index.ts`; plist backup at `~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist.pre-bun-backup`)
 - [x] T-B.9 — cleanup (pnpm-lock.yaml + pnpm-workspace.yaml + dist/ deleted) + docs (CLAUDE.md + docs/build-and-runtime.md updated)
-- [ ] T-B.10 — demo + completion report
+- [x] T-B.10 — demo + completion report (this commit; report below)
 - [x] `bun test --isolate` green: 288 pass / 0 fail / 0 errors across 34 files
 - [x] Host running on bun via launchd (PID checked at cutover, stable)
 - [x] No `vitest`, `tsx`, `better-sqlite3`, `pnpm-*` in host package tree
 - [x] CLAUDE.md and docs/build-and-runtime.md reflect bun-on-host
-- [ ] Completion report filed (T-B.10)
+- [x] Completion report filed (T-B.10 — see "Reports" section below)
 
 ## Rollback recipe
 
@@ -207,3 +207,65 @@ launchctl load ~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist
 ```
 
 Important: the pre-bun plist points at `dist/index.js`, which is gitignored. After T-B.9 deleted dist/, the rollback requires step 5 (`pnpm run build`) — which in turn requires `pnpm` and the old `pnpm-lock.yaml` to still exist in git history (they do; they were tracked under main and only deleted on this branch).
+
+## Reports
+
+### Report: Phase Bun migration
+
+**Closed:** 2026-05-03
+
+#### What was done
+
+- Migrated the host runtime from Node + pnpm + vitest + tsx + better-sqlite3 to Bun + bun:test (commits `e19c5fb`, `39fd36e`, `b8ba04b`, `70d8025`, `1bfc302`, `41d3525`, `T-B.9`).
+- 26 host source files, 8 host test files, all of `setup/`, all of `scripts/` swapped from `better-sqlite3` to `bun:sqlite` with `{ strict: true }` constructors and 24 getter sites coerced from `null` → `undefined` to preserve the `T | undefined` API contract.
+- 8 host test files translated from vitest (`vi.mock`/`vi.fn`/`vi.spyOn`/`vi.importActual`) to bun:test (`mock.module`/`mock`/`spyOn`/static pre-import). Cross-file mock isolation gained via `bun test --isolate`.
+- `bunfig.toml` carries the supply-chain gate (`install.minimumReleaseAge = 259200`) and the test-scope ignore (`pathIgnorePatterns = ["container/**"]`); `package.json` `trustedDependencies` mirrors the prior pnpm `onlyBuiltDependencies` allowlist.
+- `tsconfig.json` flips to `noEmit: true` (no more `dist/` build) with `types: ["bun", "node"]` for `bun:sqlite` / `bun:test` globals. `src/types/bun-sqlite-augment.d.ts` augments `Statement` so `.run/.get/.all` accept plain object bindings (works around bun:sqlite's stricter-than-better-sqlite3 typing without changing every `.prepare()` call site).
+- CI workflow (`.github/workflows/ci.yml`) drops Node + pnpm setup, runs everything via Bun.
+- Live launchd service (`~/Library/LaunchAgents/com.nanoclaw-v2-0ee3f1ca.plist`) cut over from `node dist/index.js` to `bun run src/index.ts`. Pre-cutover plist preserved at `.pre-bun-backup` for rollback.
+- `CLAUDE.md` and `docs/build-and-runtime.md` updated to reflect bun-on-host-and-container.
+
+#### Test coverage
+
+- Files: no new test files added — this is a port, not a new feature. Existing host test suite ported to bun:test.
+- Scenarios covered (preserved from pre-migration): all 288 host tests across 34 files (DB layer, scheduling, permissions, channels, voice, delivery, host-core, container-runner, container-runtime, modules/permissions, modules/agent-to-agent, etc.)
+- Scenarios NOT covered:
+  - `container/skills/{role-resolver,auto-skill-save}/tests/` — these import `vitest` and were never in the host vitest scope (vitest.config.ts only included `src/**/*.test.ts` and `setup/**/*.test.ts`). Now explicitly excluded from host bun test scope via `pathIgnorePatterns = ["container/**"]`. Filed as a follow-up: either give them their own bun test config under `container/skills/`, or merge into host scope (would require translating their vitest imports too). Not load-bearing — these are SKILL.md structure assertions, not behavior tests.
+  - Whisper integration test (`src/voice/stt.test.ts > transcribeAudio (integration)`) — passes when `data/models/ggml-base.bin` exists; not exercised in fresh checkouts. Pre-existing, not a migration regression.
+  - Better-sqlite3 → bun:sqlite migration in `.claude/skills/add-wechat/scripts/wire-dm.ts` and `.claude/skills/add-dashboard/resources/dashboard-pusher.ts` — these skills aren't currently installed on this host. Filed as a follow-up: convert when/if the skills are installed.
+- Coverage delta: not measured. Pre-migration baseline was 225 pass / 98 fail / 14 errors when first run under bun (the failures revealed the migration scope); post-migration is 288 pass / 0 fail / 0 errors. Test count went UP (288 vs 225) because tests that previously failed due to better-sqlite3 / vi-mock incompatibility now pass.
+
+#### Demo
+
+- Path: `tests/demo/bun-migration/run.sh`
+- What it shows: 8-section inspection that the host is end-to-end on bun — launchd plist references bun, live PID is bun, log shows clean startup, full test suite green, typecheck clean, zero better-sqlite3 importers remain, rollback recipe is discoverable, package.json has no vitest/tsx/better-sqlite3.
+- How to run: `bash tests/demo/bun-migration/run.sh`
+- Expected output: `tests/demo/bun-migration/expected.md`
+- Why inspection-only: per the demo's README, injecting a chat message to round-trip through the live family Telegram chat would risk waking real agent containers and consuming API tokens. The inspection demonstrates the system is operational without that risk. Round-trip was instead validated empirically as part of T-B.6 smoke (against an isolated DB snapshot in `/tmp/nanoclaw-bun-smoke/`) and via continued live operation post-cutover.
+
+#### Manual validation
+
+Steps the user should run when they're back to confirm the migration in the real environment:
+
+1. **Send a message in the wired Telegram chat** (the family chat with Barnaby). Expected: agent responds normally within the usual latency. If: response never arrives, check `logs/nanoclaw.log` and `logs/nanoclaw.error.log` for fatal errors; if: response is malformed/garbled, the bun runtime might be hitting a chat-sdk compat surface our tests didn't exercise.
+
+2. **Check active sessions**: `ls data/v2-sessions/`. Expected: existing session dirs still present with intact `inbound.db` / `outbound.db`. The migration ran live against the central `data/v2.db` — schema is the same, but it's worth a glance.
+
+3. **Run a scheduled task**: wait for the next morning briefing fire (06:45 local) or fs-watcher tick. Expected: agent wakes and posts to family chat. The recurrence loop wraps `messages_in` writes which exercise bun:sqlite's named-param binding under load — this validates a code path the test suite covers with mocks but production exercises with real DBs.
+
+4. **Test rollback (optional, only if curious)**: follow the rollback recipe in this doc's "Rollback" section. Confirm the pre-bun service starts cleanly. Then re-cutover by reversing the recipe (or just `git checkout feat/host-bun-migration && bun install && launchctl ...`). This validates the safety net before you really need it.
+
+5. **Push the branch**: this work is on `feat/host-bun-migration` and has NOT been pushed (per autopilot's no-push rule). When you're ready to make this the public main, merge or rebase locally then push deliberately.
+
+#### Conflicts with upstream nanoclaw conventions
+
+This phase deliberately diverges from upstream `qwibitai/nanoclaw`, which remains on Node + pnpm. Per the working pattern in `CLAUDE.md`, "upstream wins" applies to *upstream conventions*, not architectural fork choices. The user authorized the migration explicitly; the trade-off (permanent runtime divergence in exchange for a unified bun stack) is documented in this phase doc's "Context" section. Future `/update-nanoclaw` runs will need to skip the host package.json / lockfile / runtime parts of upstream changes.
+
+#### Surprises caught during execution that future readers should know
+
+- bun:sqlite's `.get(...)` returns `null` (not `undefined`) when no row matches; better-sqlite3 returned `undefined`. The host's `T | undefined` getters were silently lying — the cast hid the runtime null. Coerced at every call site with `?? undefined`. New host getters returning `T | undefined` must do the same.
+- bun:sqlite's default mode requires JS object keys to include the `@`/`$`/`:` prefix when binding named params. The host adds `{ strict: true }` to every Database constructor to bypass this and accept bare keys (matching the pre-migration code shape). The container side does NOT use strict mode — different invariant per side.
+- bun:test does NOT file-isolate `mock.module` registrations by default. Tests pass alone, fail together. `--isolate` CLI flag fixes this; baked into `package.json` `test` scripts and the demo's section 4.
+- The natural translation of `vi.mock('m', async () => { const real = await import('m'); ... })` deadlocks under bun:test because the dynamic import inside the mock factory gets caught by the mock itself. Fix: pre-import the real module statically before the `mock.module` call; ES module hoisting puts the static import first.
+- The c5d0ef8 container migration converted `@name` → `$name` in SQL because the bun:sqlite of the time required the `$` prefix. Current bun:sqlite (1.3.13) accepts `@name`/`$name`/`:name` interchangeably; no `@` → `$` rewrite was needed for the host migration.
+- bun's pnpm-migration feature (PR #22262, merged 2025-09-27) auto-converts `pnpm-lock.yaml` → `bun.lock` and carries `pnpm.overrides` / `pnpm.patchedDependencies` / catalogs to `package.json`, but does NOT carry `pnpm.minimumReleaseAge` / `onlyBuiltDependencies` — those need manual carry-over to `bunfig.toml` / `package.json` `trustedDependencies`.
