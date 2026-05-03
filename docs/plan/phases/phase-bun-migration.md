@@ -269,3 +269,26 @@ This phase deliberately diverges from upstream `qwibitai/nanoclaw`, which remain
 - The natural translation of `vi.mock('m', async () => { const real = await import('m'); ... })` deadlocks under bun:test because the dynamic import inside the mock factory gets caught by the mock itself. Fix: pre-import the real module statically before the `mock.module` call; ES module hoisting puts the static import first.
 - The c5d0ef8 container migration converted `@name` → `$name` in SQL because the bun:sqlite of the time required the `$` prefix. Current bun:sqlite (1.3.13) accepts `@name`/`$name`/`:name` interchangeably; no `@` → `$` rewrite was needed for the host migration.
 - bun's pnpm-migration feature (PR #22262, merged 2025-09-27) auto-converts `pnpm-lock.yaml` → `bun.lock` and carries `pnpm.overrides` / `pnpm.patchedDependencies` / catalogs to `package.json`, but does NOT carry `pnpm.minimumReleaseAge` / `onlyBuiltDependencies` — those need manual carry-over to `bunfig.toml` / `package.json` `trustedDependencies`.
+
+### Post-cutover incident: SIGTERM from System Settings → Login Items (2026-05-03 morning)
+
+The morning after the autopilot session that landed T-B.1 through T-B.10, the user reported "Barnaby isn't responding in the family chat." Investigation found the host process had been down since 08:11:20 (about 3 hours). Recovery was a single `launchctl load` against the existing plist; queued Telegram messages flushed within seconds.
+
+Root cause traced to **macOS Background Task Management (BTM)**:
+
+1. T-B.8 changed the launchd plist's `Program` from `/opt/homebrew/bin/node` to `/opt/homebrew/bin/bun`.
+2. macOS BTM tracks launch items by their executable's code-signing identity. The bun binary is signed by "Jarred Sumner" (bun's developer); node was signed by a different identity. BTM treated the post-edit plist as a new background item with a new owner, queued a re-approval notification (`disposition=[enabled, allowed, not notified]`), and bumped the item's Generation counter (1 → 3).
+3. After wake-from-sleep at 08:10:24, System Settings opened (manually or as part of the wake flow) and the Login Items pane enumerated background items. The notification surfaced.
+4. At 08:11:20, `smd[18000]` ("Service Management Daemon") called `bootout` against `gui/501/com.nanoclaw-v2-0ee3f1ca`. launchd sent SIGTERM and removed the service from its registry. KeepAlive does not respawn a service that's been booted out (only a crashed one).
+5. The service stayed down until manually reloaded.
+
+**Fix landed in commit `b090c0c`**: `setup/service.ts` now generates a `Homestead Nanobot.app` bundle at `~/Applications/` and points the plist at the bundle's `Contents/MacOS/homestead-nanobot` wrapper script (which `exec`s bun). The bundle's `Info.plist` declares `CFBundleName="Homestead Nanobot"`, so BTM displays that name instead of "Jarred Sumner". Verified post-install: `sfltool dumpbtm` shows `Name: Homestead Nanobot`, `Generation: 1` (fresh registration).
+
+**Post-mortem learning** for any future session that edits the plist's `Program`: macOS will queue a BTM re-approval. If you don't accept the prompt, the next System Settings → Login Items interaction can disable the item. The bundle wrapper insulates from this — future bun upgrades or path changes can be applied to the wrapper script without changing what BTM sees as the launch item's "executable."
+
+### Known stale post-migration (filed in `follow-ups.md`)
+
+- `nanoclaw.sh` + `setup/install-node.sh` + `setup/probe.sh` still install Node + pnpm. The fresh-machine install path is broken until rewritten for Bun.
+- `README_zh.md` and `README_ja.md` still reference Node + pnpm in their Requirements sections.
+- `delivery.ts` and `host-sweep.ts` still have low coverage (49% / 21% line). Same template as the router sweep would apply.
+- The `openOutboundDb` / `openOutboundDbWrite` naming asymmetry could be tightened to prevent the next "I called the read-only one for writes" bug.
