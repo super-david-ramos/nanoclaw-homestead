@@ -1,0 +1,6 @@
+[install]
+# 3 days — mirror of pnpm-workspace.yaml's `pnpm.minimumReleaseAge: 4320`
+# (pnpm uses minutes; bun uses seconds). Supply-chain gate: package versions
+# must exist on the registry for at least this long before bun resolves them.
+minimumReleaseAge = 259200
+minimumReleaseAgeExcludes = []
