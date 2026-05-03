@@ -18,6 +18,16 @@ set -euo pipefail
 cd "$(dirname "$0")/../../../.."
 ROOT=$(pwd)
 
+# Always-run cleanup so failed assertions mid-section don't leak /tmp dirs.
+# Each section that creates scratch state registers its paths here.
+SCRATCH_PATHS=()
+cleanup() {
+  for p in "${SCRATCH_PATHS[@]:-}"; do
+    [ -n "$p" ] && rm -rf "$p"
+  done
+}
+trap cleanup EXIT
+
 echo "Phase 2 demo — proactive (morning briefing + fs-watcher)"
 echo "========================================================="
 echo
@@ -63,6 +73,7 @@ echo "[2/3] vault-hash full cycle on fixture /tmp/phase2-demo-vault"
 echo "-------------------------------------------------------------"
 VAULT=/tmp/phase2-demo-vault
 STATE=/tmp/phase2-demo-vault.state
+SCRATCH_PATHS+=("$VAULT" "$STATE")
 
 rm -rf "$VAULT" "$STATE"
 mkdir -p "$VAULT"
@@ -98,7 +109,7 @@ rm -rf "$VAULT" "$STATE"
 echo
 
 # -----------------------------------------------------------------------------
-# Section 3 — fresh container against the checked-in fixture vault
+# Section 3 placeholder (cleanup moved to trap) — fresh container against the checked-in fixture vault
 # -----------------------------------------------------------------------------
 # Self-contained: spawns its own short-lived container with the fixture vault
 # mounted at /workspace/extra/Homestead and a /tmp scratch dir mounted at
@@ -112,6 +123,7 @@ echo "-------------------------------------------"
 FIXTURE="$ROOT/tests/fixtures/vault"
 SCRATCH=/tmp/phase2-demo-livevault
 SCRATCH_AGENT=/tmp/phase2-demo-liveagent
+SCRATCH_PATHS+=("$SCRATCH" "$SCRATCH_AGENT")
 
 # Pick the agent image (per-install slug). Match by prefix and take the first.
 AGENT_IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' \
@@ -175,8 +187,7 @@ TICK5=$(run_vault_hash)
 echo "    $TICK5"
 echo "$TICK5" | grep -q '"removed":\["areas/health.md"\]' || { echo "    FAIL: expected removed=[\"areas/health.md\"]"; exit 2; }
 
-# Cleanup scratch (state file + writable vault copy).
-rm -rf "$SCRATCH" "$SCRATCH_AGENT"
+# Trap-registered cleanup will rm scratch + state + livevault dirs on exit.
 
 echo
 echo "Phase 2 demo complete."
