@@ -27,7 +27,7 @@ import { insertTask } from './db.js';
 export const FS_WATCHER_SERIES_ID = 'task-fs-watcher';
 
 export const DEFAULT_FS_WATCHER_SCRIPT =
-  'bun /app/src/scripts/vault-hash.ts /workspace/extra/Homestead /workspace/agent/.fs-watcher-state';
+  'bun /app/src/scripts/vault-hash-cli.ts /workspace/extra/Homestead /workspace/agent/.fs-watcher-state';
 
 export interface ScheduleFsWatcherOpts {
   prompt: string;
@@ -44,10 +44,7 @@ export interface ScheduleFsWatcherResult {
   created: boolean;
 }
 
-export function scheduleFsWatcher(
-  inDb: Database.Database,
-  opts: ScheduleFsWatcherOpts,
-): ScheduleFsWatcherResult {
+export function scheduleFsWatcher(inDb: Database.Database, opts: ScheduleFsWatcherOpts): ScheduleFsWatcherResult {
   const existing = inDb
     .prepare(
       "SELECT id FROM messages_in WHERE series_id = ? AND kind = 'task' AND status IN ('pending','paused') ORDER BY seq DESC LIMIT 1",

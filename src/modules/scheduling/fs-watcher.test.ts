@@ -13,11 +13,7 @@ import path from 'path';
 import { describe, it, expect, afterEach } from 'vitest';
 
 import { ensureSchema, openInboundDb } from '../../db/session-db.js';
-import {
-  scheduleFsWatcher,
-  FS_WATCHER_SERIES_ID,
-  DEFAULT_FS_WATCHER_SCRIPT,
-} from './fs-watcher.js';
+import { scheduleFsWatcher, FS_WATCHER_SERIES_ID, DEFAULT_FS_WATCHER_SCRIPT } from './fs-watcher.js';
 
 const TEST_DIR = '/tmp/nanoclaw-fs-watcher-test';
 const DB_PATH = path.join(TEST_DIR, 'inbound.db');
@@ -68,8 +64,8 @@ describe('scheduleFsWatcher', () => {
     // defeats the whole point of the fs-watcher pattern.
     expect(typeof parsed.script).toBe('string');
     expect(parsed.script.length).toBeGreaterThan(0);
-    // The default body invokes vault-hash.ts through bun.
-    expect(parsed.script).toContain('vault-hash.ts');
+    // The default body invokes the vault-hash CLI through bun.
+    expect(parsed.script).toMatch(/vault-hash(-cli)?\.ts/);
     db.close();
   });
 
@@ -97,9 +93,9 @@ describe('scheduleFsWatcher', () => {
     const second = scheduleFsWatcher(db, { prompt: 'p', cron: '*/15 * * * *' });
     expect(second.created).toBe(false);
 
-    const stillPaused = db
-      .prepare('SELECT status FROM messages_in WHERE series_id = ?')
-      .get(FS_WATCHER_SERIES_ID) as { status: string };
+    const stillPaused = db.prepare('SELECT status FROM messages_in WHERE series_id = ?').get(FS_WATCHER_SERIES_ID) as {
+      status: string;
+    };
     expect(stillPaused.status).toBe('paused');
     db.close();
   });
@@ -124,7 +120,7 @@ describe('scheduleFsWatcher', () => {
   it('default script body references the standard mount and state paths', () => {
     expect(DEFAULT_FS_WATCHER_SCRIPT).toContain('/workspace/extra/Homestead');
     expect(DEFAULT_FS_WATCHER_SCRIPT).toContain('/workspace/agent/.fs-watcher-state');
-    expect(DEFAULT_FS_WATCHER_SCRIPT).toContain('vault-hash.ts');
+    expect(DEFAULT_FS_WATCHER_SCRIPT).toMatch(/vault-hash(-cli)?\.ts/);
   });
 
   it('processAfter is the cron next-run in the supplied timezone', async () => {

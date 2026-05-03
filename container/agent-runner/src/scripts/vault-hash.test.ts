@@ -11,9 +11,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
-import { computeVaultState, fsWatcherDecide } from './vault-hash.js';
+import { cliMain, computeVaultState, fsWatcherDecide } from './vault-hash.js';
 
 const ROOT = '/tmp/nanoclaw-vault-hash-test';
 const VAULT = path.join(ROOT, 'vault');
@@ -171,17 +171,8 @@ describe('computeVaultState', () => {
   });
 
   it('handles a file deleted mid-scan (read race) by skipping it', () => {
-    // walkFiles collects paths first, then computeVaultState reads each. If a
-    // file is deleted between the two phases, readFileSync throws and the
-    // scan continues. Simulate by overriding readFileSync via a child
-    // computeVaultState call against a vault whose file is removed
-    // synchronously between the readdir and read steps.
-    //
-    // We can't easily cause that race in pure-JS land without monkey-patching
-    // fs, so this asserts a slightly weaker invariant: after deleting a
-    // single file mid-test, the second computeVaultState call reflects the
-    // deletion (rather than crashing). The catch block guards a true race;
-    // here we exercise the surrounding code path.
+    // Surrounding code path: deletion between two consecutive scans is
+    // visible in the next result (no crash, fileCount drops).
     write('a.md', 'a');
     write('b.md', 'b');
     const before = computeVaultState(VAULT);
@@ -191,6 +182,32 @@ describe('computeVaultState', () => {
     const after = computeVaultState(VAULT);
     expect(after.fileCount).toBe(1);
     expect(Object.keys(after.files)).toEqual(['a.md']);
+  });
+
+  it('exercises the read-race catch when readFileSync throws mid-scan', () => {
+    // The catch on line 116 fires when walkFiles returned a path but
+    // readFileSync subsequently throws (file deleted between the readdir
+    // and read steps). Spy on fs.readFileSync to simulate that race for
+    // one specific file.
+    write('a.md', 'a-content');
+    write('b.md', 'b-content');
+
+    const orig = fs.readFileSync;
+    const spy = spyOn(fs, 'readFileSync').mockImplementation(((p: string, ...rest: unknown[]) => {
+      if (typeof p === 'string' && p.endsWith('/b.md')) {
+        throw new Error('ENOENT: vanished mid-scan');
+      }
+      return (orig as any)(p, ...rest);
+    }) as typeof fs.readFileSync);
+
+    try {
+      const result = computeVaultState(VAULT);
+      // a.md was readable; b.md vanished mid-read and got skipped quietly.
+      expect(result.fileCount).toBe(1);
+      expect(Object.keys(result.files)).toEqual(['a.md']);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('returns a stable empty-vault hash with fileCount=0', () => {
@@ -294,41 +311,82 @@ describe('fsWatcherDecide', () => {
 });
 
 // -----------------------------------------------------------------------------
-// CLI shim — bash invokes `bun /app/src/scripts/vault-hash.ts <root> <state>`.
-// The shim reads argv, runs fsWatcherDecide, prints exactly one JSON line.
-// task-script.ts depends on that shape (last stdout line parsed as JSON).
+// cliMain — the testable CLI entry. Returns an exit code so tests assert it
+// without ending the runner. task-script.ts depends on the last stdout line
+// parsing as JSON, so we lock that contract here.
 // -----------------------------------------------------------------------------
 
-import { spawnSync } from 'node:child_process';
-
-describe('vault-hash CLI', () => {
-  it('prints a JSON decision when invoked with valid args', () => {
+describe('cliMain', () => {
+  it('prints a JSON decision and returns 0 on valid args', () => {
     fs.mkdirSync(VAULT, { recursive: true });
     fs.writeFileSync(path.join(VAULT, 'a.md'), 'a');
 
-    const result = spawnSync(
-      'bun',
-      [path.resolve(__dirname, 'vault-hash.ts'), VAULT, STATE],
-      { encoding: 'utf8' },
-    );
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = cliMain(['bun', 'vault-hash.ts', VAULT, STATE], {
+      out: (s) => stdout.push(s),
+      err: (s) => stderr.push(s),
+    });
 
-    expect(result.status).toBe(0);
-    const lastLine = result.stdout.trim().split('\n').pop()!;
-    const decision = JSON.parse(lastLine);
+    expect(code).toBe(0);
+    expect(stdout).toHaveLength(1);
+    const decision = JSON.parse(stdout[0]);
     expect(decision.wakeAgent).toBe(false);
     expect(decision.data.firstRun).toBe(true);
     expect(decision.data.fileCount).toBe(1);
+    expect(stderr).toHaveLength(0);
   });
 
-  it('exits 2 with usage on missing args', () => {
-    const result = spawnSync(
-      'bun',
-      [path.resolve(__dirname, 'vault-hash.ts')],
-      { encoding: 'utf8' },
-    );
+  it('returns 2 with usage error on missing rootPath', () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = cliMain(['bun', 'vault-hash.ts'], {
+      out: (s) => stdout.push(s),
+      err: (s) => stderr.push(s),
+    });
 
-    expect(result.status).toBe(2);
-    expect(result.stderr).toContain('usage:');
+    expect(code).toBe(2);
+    expect(stderr.join('\n')).toContain('usage:');
+    expect(stdout).toHaveLength(0);
+  });
+
+  it('returns 2 when only one arg is provided', () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = cliMain(['bun', 'vault-hash.ts', VAULT], {
+      out: (s) => stdout.push(s),
+      err: (s) => stderr.push(s),
+    });
+
+    expect(code).toBe(2);
+    expect(stderr.join('\n')).toContain('usage:');
+  });
+
+  it('uses console default IO when no io override is supplied — success path', () => {
+    // Default io path — covers the optional-parameter default's `out` closure.
+    fs.mkdirSync(VAULT, { recursive: true });
+    fs.writeFileSync(path.join(VAULT, 'a.md'), 'a');
+
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const code = cliMain(['bun', 'vault-hash.ts', VAULT, STATE]);
+      expect(code).toBe(0);
+      expect(logSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it('uses console default IO when no io override is supplied — error path', () => {
+    // Default io path — covers the optional-parameter default's `err` closure.
+    const errSpy = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const code = cliMain(['bun', 'vault-hash.ts']); // missing args
+      expect(code).toBe(2);
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      errSpy.mockRestore();
+    }
   });
 });
 

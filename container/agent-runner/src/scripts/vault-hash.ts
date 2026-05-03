@@ -229,16 +229,30 @@ export function fsWatcherDecide(rootPath: string, statePath: string): FsWatcherD
 }
 
 // CLI entry — bash invokes `bun /app/src/scripts/vault-hash.ts <root> <state>`.
-// Bun runs this file by URL when imported, so we gate the CLI block to only
-// fire when invoked directly. The scheduling task-script reader takes the
-// last stdout line as JSON.
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
-if (isMainModule) {
-  const [, , rootPath, statePath] = process.argv;
+// Extracted as a testable function. The scheduling task-script reader takes
+// the last stdout line as JSON.
+//
+// `argv` mirrors `process.argv` shape: [bin, script, ...args]. Returns the
+// process exit code; tests can assert it without ending the test runner.
+export function cliMain(
+  argv: string[],
+  io: { out: (s: string) => void; err: (s: string) => void } = {
+    out: (s) => console.log(s),
+    err: (s) => console.error(s),
+  },
+): number {
+  const [, , rootPath, statePath] = argv;
   if (!rootPath || !statePath) {
-    console.error('usage: bun vault-hash.ts <vaultRoot> <stateFile>');
-    process.exit(2);
+    io.err('usage: bun vault-hash.ts <vaultRoot> <stateFile>');
+    return 2;
   }
   const decision = fsWatcherDecide(rootPath, statePath);
-  console.log(JSON.stringify(decision));
+  io.out(JSON.stringify(decision));
+  return 0;
 }
+
+// CLI bootstrap lives in vault-hash-cli.ts — that file's only job is to
+// invoke cliMain(process.argv) so this module stays 100% library-only and
+// fully unit-testable. The scheduling task script invokes vault-hash-cli.ts
+// directly; see DEFAULT_FS_WATCHER_SCRIPT in src/modules/scheduling/fs-watcher.ts
+// (host-side helper).
