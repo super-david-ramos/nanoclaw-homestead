@@ -142,6 +142,57 @@ describe('computeVaultState', () => {
     expect(after).toBe(before);
   });
 
+  it('returns __MISSING__ sentinel state when the root path does not exist', () => {
+    // Direct call (fsWatcherDecide guards earlier; computeVaultState is also
+    // a public export so we cover its early-return branch independently).
+    const result = computeVaultState('/tmp/definitely-does-not-exist-' + Date.now());
+    expect(result.hash).toBe('__MISSING__');
+    expect(result.fileCount).toBe(0);
+    expect(result.files).toEqual({});
+  });
+
+  it('skips unreadable subdirectories without throwing', () => {
+    // walkFiles wraps readdirSync in try/catch so a single permission-denied
+    // subdirectory doesn't sink the scan. Test by chmod 000 on a child dir.
+    write('areas/health.md', 'h1');
+    fs.mkdirSync(path.join(VAULT, 'locked'), { recursive: true });
+    fs.writeFileSync(path.join(VAULT, 'locked/secret.md'), 'should not be read');
+    fs.chmodSync(path.join(VAULT, 'locked'), 0o000);
+
+    try {
+      const result = computeVaultState(VAULT);
+      // Only the readable file is hashed.
+      expect(result.fileCount).toBe(1);
+      expect(Object.keys(result.files)).toEqual(['areas/health.md']);
+    } finally {
+      // Restore permissions so afterEach can clean up.
+      fs.chmodSync(path.join(VAULT, 'locked'), 0o755);
+    }
+  });
+
+  it('handles a file deleted mid-scan (read race) by skipping it', () => {
+    // walkFiles collects paths first, then computeVaultState reads each. If a
+    // file is deleted between the two phases, readFileSync throws and the
+    // scan continues. Simulate by overriding readFileSync via a child
+    // computeVaultState call against a vault whose file is removed
+    // synchronously between the readdir and read steps.
+    //
+    // We can't easily cause that race in pure-JS land without monkey-patching
+    // fs, so this asserts a slightly weaker invariant: after deleting a
+    // single file mid-test, the second computeVaultState call reflects the
+    // deletion (rather than crashing). The catch block guards a true race;
+    // here we exercise the surrounding code path.
+    write('a.md', 'a');
+    write('b.md', 'b');
+    const before = computeVaultState(VAULT);
+    expect(before.fileCount).toBe(2);
+
+    fs.rmSync(path.join(VAULT, 'b.md'));
+    const after = computeVaultState(VAULT);
+    expect(after.fileCount).toBe(1);
+    expect(Object.keys(after.files)).toEqual(['a.md']);
+  });
+
   it('returns a stable empty-vault hash with fileCount=0', () => {
     const a = computeVaultState(VAULT);
     expect(a.fileCount).toBe(0);
@@ -239,6 +290,45 @@ describe('fsWatcherDecide', () => {
     expect(() => fsWatcherDecide(VAULT, STATE)).not.toThrow();
     const decision = fsWatcherDecide(VAULT, STATE);
     expect(decision.wakeAgent).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// CLI shim — bash invokes `bun /app/src/scripts/vault-hash.ts <root> <state>`.
+// The shim reads argv, runs fsWatcherDecide, prints exactly one JSON line.
+// task-script.ts depends on that shape (last stdout line parsed as JSON).
+// -----------------------------------------------------------------------------
+
+import { spawnSync } from 'node:child_process';
+
+describe('vault-hash CLI', () => {
+  it('prints a JSON decision when invoked with valid args', () => {
+    fs.mkdirSync(VAULT, { recursive: true });
+    fs.writeFileSync(path.join(VAULT, 'a.md'), 'a');
+
+    const result = spawnSync(
+      'bun',
+      [path.resolve(__dirname, 'vault-hash.ts'), VAULT, STATE],
+      { encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(0);
+    const lastLine = result.stdout.trim().split('\n').pop()!;
+    const decision = JSON.parse(lastLine);
+    expect(decision.wakeAgent).toBe(false);
+    expect(decision.data.firstRun).toBe(true);
+    expect(decision.data.fileCount).toBe(1);
+  });
+
+  it('exits 2 with usage on missing args', () => {
+    const result = spawnSync(
+      'bun',
+      [path.resolve(__dirname, 'vault-hash.ts')],
+      { encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('usage:');
   });
 });
 
@@ -346,6 +436,30 @@ describe('fsWatcherDecide diff', () => {
     // Hashes are non-empty strings.
     expect(persisted.files!['a.md'].length).toBeGreaterThan(0);
     expect(persisted.files!['b.md'].length).toBeGreaterThan(0);
+  });
+
+  it('garbage state file (invalid JSON) is treated as missing — re-baselines silently', () => {
+    write('a.md', 'a1');
+    fs.writeFileSync(STATE, 'not json {{{');
+
+    const decision = fsWatcherDecide(VAULT, STATE);
+
+    expect(decision.wakeAgent).toBe(false);
+    expect(decision.data.firstRun).toBe(true);
+
+    const persisted = JSON.parse(fs.readFileSync(STATE, 'utf8')) as { hash: string };
+    expect(typeof persisted.hash).toBe('string');
+  });
+
+  it('state file with non-string hash is treated as missing', () => {
+    // Defensive: if some previous version wrote a numeric or null hash,
+    // we should not crash trying to compare it.
+    write('a.md', 'a1');
+    fs.writeFileSync(STATE, JSON.stringify({ hash: 123, files: {} }));
+
+    const decision = fsWatcherDecide(VAULT, STATE);
+    expect(decision.wakeAgent).toBe(false);
+    expect(decision.data.firstRun).toBe(true);
   });
 
   it('legacy state file (no per-file map) is treated as missing — re-baselines silently', () => {
