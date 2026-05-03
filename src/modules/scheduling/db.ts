@@ -89,14 +89,14 @@ export function updateTask(db: Database, taskId: string, update: TaskUpdate): nu
 
       // Build SET clause dynamically so callers can update fields independently.
       const sets: string[] = ['content = ?'];
-      const params: unknown[] = [content];
+      const params: (string | null)[] = [content];
       if (setProcessAfter) {
         sets.push('process_after = ?');
-        params.push(update.processAfter);
+        params.push(update.processAfter ?? null);
       }
       if (setRecurrence) {
         sets.push('recurrence = ?');
-        params.push(update.recurrence);
+        params.push(update.recurrence ?? null);
       }
       params.push(row.id);
 

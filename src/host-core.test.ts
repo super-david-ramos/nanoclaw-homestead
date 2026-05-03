@@ -6,7 +6,7 @@
 import { Database } from 'bun:sqlite';
 import fs from 'fs';
 import path from 'path';
-import { describe, it, expect, beforeEach, afterEach, mock , spyOn} from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test';
 import * as actualConfig from './config.js';
 
 import {

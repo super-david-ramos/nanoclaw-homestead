@@ -138,7 +138,7 @@ export function getPendingQuestion(questionId: string): PendingQuestion | undefi
     (getDb().prepare('SELECT * FROM pending_questions WHERE question_id = ?').get(questionId) as
       | (Omit<PendingQuestion, 'options'> & { options_json: string })
       | undefined) ?? undefined;
-  if (!row) return undefined ?? undefined;
+  if (!row) return undefined;
   const { options_json, ...rest } = row;
   return { ...rest, options: JSON.parse(options_json) };
 }
@@ -239,5 +239,5 @@ export function getAskQuestionRender(
     if (s?.title) return { title: s.title, options: JSON.parse(s.options_json) };
   }
 
-  return undefined ?? undefined;
+  return undefined;
 }
