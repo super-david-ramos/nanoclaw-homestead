@@ -14,6 +14,7 @@ Phases are sequential but tasks within a phase can parallelize where dependencie
 | 1 | Voice everywhere — STT preprocessor + TTS postprocessor across all channels | [phases/phase-1-voice.md](phases/phase-1-voice.md) |
 | 2 | Proactive household value — morning briefing, fs-watcher equivalent | [phases/phase-2-proactive.md](phases/phase-2-proactive.md) |
 | 3 | Owen + safety — child role, content filter, OPA reintroduction | [phases/phase-3-owen-safety.md](phases/phase-3-owen-safety.md) |
+| Bun migration | Host runtime: Node + pnpm → Bun. Unifies host and container on one runtime. | [phases/phase-bun-migration.md](phases/phase-bun-migration.md) |
 
 ## Out of scope for v0 (with reintroduction conditions)
 
