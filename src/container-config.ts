@@ -47,6 +47,13 @@ export interface ContainerConfig {
   agentGroupId?: string;
   /** Max messages per prompt. Falls back to code default if unset. */
   maxMessagesPerPrompt?: number;
+  /**
+   * Optional model identifier (e.g. 'claude-haiku-4-5-20251001'). When set,
+   * the runner injects ANTHROPIC_MODEL into the provider's env so the
+   * Claude SDK uses this model. When unset, the SDK picks its default
+   * (currently Sonnet for the claude_code preset).
+   */
+  model?: string;
 }
 
 function emptyConfig(): ContainerConfig {
@@ -87,6 +94,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       assistantName: raw.assistantName,
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
+      model: raw.model,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);

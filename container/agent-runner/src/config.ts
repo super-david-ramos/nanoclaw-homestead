@@ -16,11 +16,39 @@ export interface RunnerConfig {
   agentGroupId: string;
   maxMessagesPerPrompt: number;
   mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>;
+  /**
+   * Optional model identifier (e.g. 'claude-haiku-4-5-20251001'). When set,
+   * the runner injects ANTHROPIC_MODEL into the provider's env so the
+   * Claude SDK uses this model. When unset, the SDK picks its default
+   * (currently Sonnet for the claude_code preset).
+   *
+   * Per-agent-group selection: the test agent runs Haiku (cheap +
+   * deterministic for sandbox round trips), production stays Sonnet.
+   */
+  model?: string;
 }
 
 const DEFAULT_MAX_MESSAGES = 10;
 
 let _config: RunnerConfig | null = null;
+
+/**
+ * Pure parser — split out from loadConfig so tests don't need the
+ * /workspace/agent/container.json path to exist. Defensive about field
+ * types since container.json is hand-edited or written by self-mod.
+ */
+export function parseConfig(raw: Record<string, unknown>): RunnerConfig {
+  return {
+    provider: typeof raw.provider === 'string' ? raw.provider : 'claude',
+    assistantName: typeof raw.assistantName === 'string' ? raw.assistantName : '',
+    groupName: typeof raw.groupName === 'string' ? raw.groupName : '',
+    agentGroupId: typeof raw.agentGroupId === 'string' ? raw.agentGroupId : '',
+    maxMessagesPerPrompt:
+      typeof raw.maxMessagesPerPrompt === 'number' ? raw.maxMessagesPerPrompt : DEFAULT_MAX_MESSAGES,
+    mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
+    model: typeof raw.model === 'string' && raw.model.length > 0 ? raw.model : undefined,
+  };
+}
 
 /**
  * Load config from container.json. Called once at startup.
@@ -36,15 +64,7 @@ export function loadConfig(): RunnerConfig {
     console.error(`[config] Failed to read ${CONFIG_PATH}, using defaults`);
   }
 
-  _config = {
-    provider: (raw.provider as string) || 'claude',
-    assistantName: (raw.assistantName as string) || '',
-    groupName: (raw.groupName as string) || '',
-    agentGroupId: (raw.agentGroupId as string) || '',
-    maxMessagesPerPrompt: (raw.maxMessagesPerPrompt as number) || DEFAULT_MAX_MESSAGES,
-    mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
-  };
-
+  _config = parseConfig(raw);
   return _config;
 }
 

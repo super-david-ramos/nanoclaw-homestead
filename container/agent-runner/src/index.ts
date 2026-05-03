@@ -86,10 +86,20 @@ async function main(): Promise<void> {
     log(`Additional MCP server: ${name} (${serverConfig.command})`);
   }
 
+  // Per-agent model override: when container.json specifies a model, set
+  // ANTHROPIC_MODEL so the Claude SDK picks it up. Without this, the SDK
+  // uses its default (currently Sonnet for the claude_code preset). Lets
+  // the test bot run on Haiku without affecting production.
+  const env: Record<string, string | undefined> = { ...process.env };
+  if (config.model) {
+    env.ANTHROPIC_MODEL = config.model;
+    log(`Using model: ${config.model} (from container.json)`);
+  }
+
   const provider = createProvider(providerName, {
     assistantName: config.assistantName || undefined,
     mcpServers,
-    env: { ...process.env },
+    env,
     additionalDirectories: additionalDirectories.length > 0 ? additionalDirectories : undefined,
   });
 
