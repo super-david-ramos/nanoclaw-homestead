@@ -32,6 +32,20 @@ export function openOutboundDb(dbPath: string): Database {
   return db;
 }
 
+/**
+ * Open the outbound DB for direct host writes (the command-gate deny path).
+ * Normally only the container writes to outbound.db; this is a narrow
+ * exception for the host to inject a "Permission denied" response without
+ * waking a container. Same DELETE journal mode + busy_timeout as the
+ * container's writer side.
+ */
+export function openOutboundDbWrite(dbPath: string): Database {
+  const db = new Database(dbPath, { strict: true });
+  db.run('PRAGMA journal_mode = DELETE');
+  db.run('PRAGMA busy_timeout = 5000');
+  return db;
+}
+
 export function upsertSessionRouting(
   db: Database,
   routing: { channel_type: string | null; platform_id: string | null; thread_id: string | null },

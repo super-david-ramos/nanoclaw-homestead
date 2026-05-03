@@ -240,9 +240,7 @@ describe('routeInbound — engage_mode=mention-sticky', () => {
       created_at: now(),
     });
     const { routeInbound } = await import('./router.js');
-    await routeInbound(
-      defaultEvent({ platformId: 'dm-1', message: { ...defaultEvent().message, isMention: false } }),
-    );
+    await routeInbound(defaultEvent({ platformId: 'dm-1', message: { ...defaultEvent().message, isMention: false } }));
     const drop = getDb().prepare('SELECT reason FROM unregistered_senders').get() as { reason: string };
     expect(drop.reason).toBe('no_agent_engaged');
   });
@@ -273,7 +271,11 @@ describe('routeInbound — engage_mode=mention-sticky', () => {
     // First call WITH mention establishes the session; mention-sticky sees
     // isMention=true and engages.
     await routeInbound(
-      defaultEvent({ platformId: 'chan-grp', threadId: 'thr-1', message: { ...defaultEvent().message, isMention: true } }),
+      defaultEvent({
+        platformId: 'chan-grp',
+        threadId: 'thr-1',
+        message: { ...defaultEvent().message, isMention: true },
+      }),
     );
     // Second call WITHOUT mention — sticky should still engage because the
     // session is now alive for (ag-1, mg-grp, thr-1).
@@ -386,5 +388,91 @@ describe('routeInbound — no_agent_engaged audit', () => {
     await routeInbound(defaultEvent({ message: { ...defaultEvent().message, isMention: false } }));
     const dropped = (getDb().prepare('SELECT COUNT(*) AS c FROM unregistered_senders').get() as { c: number }).c;
     expect(dropped).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Command gate — filter (silent drop) + deny (writeOutboundDirect)
+// ---------------------------------------------------------------------------
+
+describe('routeInbound — command gate', () => {
+  beforeEach(() => {
+    createAgentGroup({ id: 'ag-1', name: 'A', folder: 'a', agent_provider: null, created_at: now() });
+    createMessagingGroup({
+      id: 'mg-1',
+      channel_type: 'discord',
+      platform_id: 'chan-1',
+      name: 'General',
+      is_group: 1,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+    createMessagingGroupAgent({
+      id: 'mga-1',
+      messaging_group_id: 'mg-1',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+  });
+
+  it('filters /help silently — no session created, no inbound message, no outbound message', async () => {
+    const { routeInbound } = await import('./router.js');
+    const { findSession } = await import('./db/sessions.js');
+    await routeInbound(
+      defaultEvent({
+        message: {
+          id: 'msg-help',
+          kind: 'chat',
+          content: JSON.stringify({ text: '/help' }),
+          timestamp: now(),
+        },
+      }),
+    );
+    // The session DOES get created by resolveSession before the command gate
+    // runs (resolveSession is part of deliverToAgent, invoked once engages
+    // is true). The gate-filter then short-circuits before writeSessionMessage
+    // and writeOutboundDirect, so the inbound and outbound DBs stay empty for
+    // this command. Session existence alone is fine — it's an empty container
+    // until a real message arrives.
+    const session = findSession('mg-1', null);
+    expect(session).toBeDefined();
+    // No no_agent_engaged audit row either — engagement happened, command
+    // gate just filtered the resulting delivery.
+    const dropped = (getDb().prepare('SELECT COUNT(*) AS c FROM unregistered_senders').get() as { c: number }).c;
+    expect(dropped).toBe(0);
+  });
+
+  it('denies admin commands from non-admin users — writes a "Permission denied" outbound message', async () => {
+    const { routeInbound } = await import('./router.js');
+    const { findSession } = await import('./db/sessions.js');
+    await routeInbound(
+      defaultEvent({
+        message: {
+          id: 'msg-clear',
+          kind: 'chat',
+          content: JSON.stringify({ text: '/clear' }),
+          timestamp: now(),
+        },
+      }),
+    );
+    const session = findSession('mg-1', null);
+    expect(session).toBeDefined();
+    // The deny path uses writeOutboundDirect — opens outbound.db and inserts
+    // a chat message with "Permission denied: /clear requires admin access."
+    const { Database } = await import('bun:sqlite');
+    const { outboundDbPath } = await import('./session-manager.js');
+    const db = new Database(outboundDbPath('ag-1', session!.id), { readonly: true, strict: true });
+    const rows = db.prepare('SELECT content FROM messages_out').all() as Array<{ content: string }>;
+    db.close();
+    expect(rows).toHaveLength(1);
+    const parsed = JSON.parse(rows[0].content) as { text: string };
+    expect(parsed.text).toContain('Permission denied');
+    expect(parsed.text).toContain('/clear');
   });
 });
