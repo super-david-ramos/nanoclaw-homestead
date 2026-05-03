@@ -637,3 +637,179 @@ describe('routeInbound — defensive default for unknown engage_mode', () => {
     expect(drop.reason).toBe('no_agent_engaged');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Adapter behaviors — non-threaded thread-strip, per-thread session switch
+//
+// These need a controllable channel adapter mock. We mock the registry's
+// getChannelAdapter to return a per-test adapter object; the mock is module-
+// scoped (set via a closure variable so individual tests can vary it).
+// ---------------------------------------------------------------------------
+
+let mockedAdapter: { name: string; channelType: string; supportsThreads: boolean; subscribe?: () => Promise<void> } | undefined;
+
+// Pre-import to avoid the async-mock-factory deadlock pattern (an async
+// factory that does `await import('./channels/channel-registry.js')`
+// triggers the mock for the same module and waits forever).
+import * as actualChannelRegistry from './channels/channel-registry.js';
+mock.module('./channels/channel-registry.js', () => ({
+  ...actualChannelRegistry,
+  getChannelAdapter: () => mockedAdapter,
+}));
+
+describe('routeInbound — adapter thread policy', () => {
+  beforeEach(() => {
+    createAgentGroup({ id: 'ag-1', name: 'A', folder: 'a', agent_provider: null, created_at: now() });
+    createMessagingGroup({
+      id: 'mg-1',
+      channel_type: 'telegram',
+      platform_id: 'chat-1',
+      name: 'Group',
+      is_group: 1,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+    createMessagingGroupAgent({
+      id: 'mga-1',
+      messaging_group_id: 'mg-1',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+    mockedAdapter = undefined;
+  });
+
+  afterEach(() => {
+    mockedAdapter = undefined;
+  });
+
+  it('strips threadId when the adapter declares supportsThreads=false (non-threaded platform)', async () => {
+    mockedAdapter = { name: 'telegram', channelType: 'telegram', supportsThreads: false };
+    const { routeInbound } = await import('./router.js');
+    const { findSession } = await import('./db/sessions.js');
+    await routeInbound(
+      defaultEvent({
+        channelType: 'telegram',
+        platformId: 'chat-1',
+        threadId: 'sub-1',
+        message: { ...defaultEvent().message, isMention: true },
+      }),
+    );
+    // Even though we passed threadId='sub-1', the non-threaded adapter
+    // collapses to the channel — the resulting session is keyed on
+    // (mg-1, threadId=null) per shared mode + thread strip.
+    const s = findSession('mg-1', null);
+    expect(s).toBeDefined();
+    // And findSession against the original threadId returns nothing — it
+    // was stripped before the session lookup.
+    const sWrong = findSession('mg-1', 'sub-1');
+    expect(sWrong).toBeUndefined();
+  });
+});
+
+describe('routeInbound — deliverToAgent session-mode resolution', () => {
+  beforeEach(() => {
+    createAgentGroup({ id: 'ag-1', name: 'A', folder: 'a', agent_provider: null, created_at: now() });
+    mockedAdapter = undefined;
+  });
+
+  afterEach(() => {
+    mockedAdapter = undefined;
+  });
+
+  it('forces per-thread sessions on a threaded adapter in a group when the wiring is non-shared', async () => {
+    // Wiring says session_mode='shared', but the threaded adapter overrides
+    // — group threads each get their own session.
+    createMessagingGroup({
+      id: 'mg-grp',
+      channel_type: 'discord',
+      platform_id: 'chan-grp',
+      name: 'G',
+      is_group: 1,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+    createMessagingGroupAgent({
+      id: 'mga',
+      messaging_group_id: 'mg-grp',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+    mockedAdapter = { name: 'discord', channelType: 'discord', supportsThreads: true };
+    const { routeInbound } = await import('./router.js');
+    const { findSession } = await import('./db/sessions.js');
+    await routeInbound(
+      defaultEvent({ platformId: 'chan-grp', threadId: 'thr-A', message: { ...defaultEvent().message, isMention: true } }),
+    );
+    await routeInbound(
+      defaultEvent({
+        platformId: 'chan-grp',
+        threadId: 'thr-B',
+        message: { id: 'm-B', kind: 'chat', content: '{"text":"second"}', timestamp: now(), isMention: true },
+      }),
+    );
+    const sA = findSession('mg-grp', 'thr-A');
+    const sB = findSession('mg-grp', 'thr-B');
+    expect(sA).toBeDefined();
+    expect(sB).toBeDefined();
+    expect(sA!.id).not.toBe(sB!.id);
+  });
+
+  it('keeps a non-per-thread mode in DMs (is_group=0) — DMs collapse to one session per agent', async () => {
+    createMessagingGroup({
+      id: 'mg-dm',
+      channel_type: 'discord',
+      platform_id: 'dm-target',
+      name: 'DM',
+      is_group: 0,
+      unknown_sender_policy: 'public',
+      created_at: now(),
+    });
+    createMessagingGroupAgent({
+      id: 'mga',
+      messaging_group_id: 'mg-dm',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+    mockedAdapter = { name: 'discord', channelType: 'discord', supportsThreads: true };
+    const { routeInbound } = await import('./router.js');
+    const { findSession } = await import('./db/sessions.js');
+    // Two messages with different threadIds in a DM — both should hit the
+    // same shared session because is_group=0 short-circuits the per-thread
+    // override.
+    await routeInbound(
+      defaultEvent({ platformId: 'dm-target', threadId: 'thr-X', message: { ...defaultEvent().message, isMention: true } }),
+    );
+    await routeInbound(
+      defaultEvent({
+        platformId: 'dm-target',
+        threadId: 'thr-Y',
+        message: { id: 'm-Y', kind: 'chat', content: '{"text":"second"}', timestamp: now(), isMention: true },
+      }),
+    );
+    const s1 = findSession('mg-dm', 'thr-X');
+    const s2 = findSession('mg-dm', 'thr-Y');
+    const sShared = findSession('mg-dm', null);
+    // Both threadId-keyed lookups miss; the shared session is the only one.
+    expect(s1).toBeUndefined();
+    expect(s2).toBeUndefined();
+    expect(sShared).toBeDefined();
+  });
+});
