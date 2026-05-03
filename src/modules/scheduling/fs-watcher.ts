@@ -19,7 +19,7 @@
  * Caller can override via `opts.script` if a different mount is wired.
  */
 import { CronExpressionParser } from 'cron-parser';
-import type Database from 'better-sqlite3';
+import type { Database } from 'bun:sqlite';
 
 import { TIMEZONE } from '../../config.js';
 import { insertTask } from './db.js';
@@ -44,12 +44,12 @@ export interface ScheduleFsWatcherResult {
   created: boolean;
 }
 
-export function scheduleFsWatcher(inDb: Database.Database, opts: ScheduleFsWatcherOpts): ScheduleFsWatcherResult {
+export function scheduleFsWatcher(inDb: Database, opts: ScheduleFsWatcherOpts): ScheduleFsWatcherResult {
   const existing = inDb
     .prepare(
       "SELECT id FROM messages_in WHERE series_id = ? AND kind = 'task' AND status IN ('pending','paused') ORDER BY seq DESC LIMIT 1",
     )
-    .get(FS_WATCHER_SERIES_ID) as { id: string } | undefined;
+    .get(FS_WATCHER_SERIES_ID) as { id: string } | undefined ?? undefined;
 
   if (existing) {
     return { taskId: existing.id, created: false };

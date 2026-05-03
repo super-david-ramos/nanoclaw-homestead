@@ -13,7 +13,7 @@
  * scripts".
  */
 import { CronExpressionParser } from 'cron-parser';
-import type Database from 'better-sqlite3';
+import type { Database } from 'bun:sqlite';
 
 import { TIMEZONE } from '../../config.js';
 import { insertTask } from './db.js';
@@ -35,14 +35,14 @@ export interface ScheduleMorningBriefingResult {
 }
 
 export function scheduleMorningBriefing(
-  inDb: Database.Database,
+  inDb: Database,
   opts: ScheduleMorningBriefingOpts,
 ): ScheduleMorningBriefingResult {
   const existing = inDb
     .prepare(
       "SELECT id FROM messages_in WHERE series_id = ? AND kind = 'task' AND status IN ('pending','paused') ORDER BY seq DESC LIMIT 1",
     )
-    .get(MORNING_BRIEFING_SERIES_ID) as { id: string } | undefined;
+    .get(MORNING_BRIEFING_SERIES_ID) as { id: string } | undefined ?? undefined;
 
   if (existing) {
     return { taskId: existing.id, created: false };

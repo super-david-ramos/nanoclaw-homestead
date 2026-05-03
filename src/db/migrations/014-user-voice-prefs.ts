@@ -7,13 +7,13 @@
  * option because the delivery layer needs to make the TTS-or-not decision
  * in the hot path, not by waking an LLM read.
  */
-import type Database from 'better-sqlite3';
+import type { Database } from 'bun:sqlite';
 import type { Migration } from './index.js';
 
 export const migration014: Migration = {
   version: 14,
   name: 'user-voice-prefs',
-  up(db: Database.Database) {
+  up(db: Database) {
     db.exec(`ALTER TABLE users ADD COLUMN prefers_voice_replies INTEGER NOT NULL DEFAULT 0`);
   },
 };

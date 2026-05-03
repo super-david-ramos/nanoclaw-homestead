@@ -8,7 +8,7 @@
  * INSERT OR IGNORE in markDelivered makes the DB write idempotent, but
  * the channel API has already fired twice → user sees the message twice.
  */
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import fs from 'fs';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -54,7 +54,7 @@ function seedAgentAndChannel(): void {
 }
 
 function insertOutbound(agentGroupId: string, sessionId: string, msgId: string): void {
-  const db = new Database(outboundDbPath(agentGroupId, sessionId));
+  const db = new Database(outboundDbPath(agentGroupId, sessionId), { strict: true });
   db.prepare(
     `INSERT INTO messages_out (id, timestamp, kind, platform_id, channel_type, content)
      VALUES (?, datetime('now'), 'chat', 'telegram:123', 'telegram', ?)`,

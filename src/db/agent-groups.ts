@@ -11,11 +11,11 @@ export function createAgentGroup(group: AgentGroup): void {
 }
 
 export function getAgentGroup(id: string): AgentGroup | undefined {
-  return getDb().prepare('SELECT * FROM agent_groups WHERE id = ?').get(id) as AgentGroup | undefined;
+  return getDb().prepare('SELECT * FROM agent_groups WHERE id = ?').get(id) as AgentGroup | undefined ?? undefined;
 }
 
 export function getAgentGroupByFolder(folder: string): AgentGroup | undefined {
-  return getDb().prepare('SELECT * FROM agent_groups WHERE folder = ?').get(folder) as AgentGroup | undefined;
+  return getDb().prepare('SELECT * FROM agent_groups WHERE folder = ?').get(folder) as AgentGroup | undefined ?? undefined;
 }
 
 export function getAllAgentGroups(): AgentGroup[] {

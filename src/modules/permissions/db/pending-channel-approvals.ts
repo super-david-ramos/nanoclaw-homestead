@@ -41,13 +41,13 @@ export function createPendingChannelApproval(row: PendingChannelApproval): void 
 export function getPendingChannelApproval(messagingGroupId: string): PendingChannelApproval | undefined {
   return getDb()
     .prepare('SELECT * FROM pending_channel_approvals WHERE messaging_group_id = ?')
-    .get(messagingGroupId) as PendingChannelApproval | undefined;
+    .get(messagingGroupId) as PendingChannelApproval | undefined ?? undefined;
 }
 
 export function hasInFlightChannelApproval(messagingGroupId: string): boolean {
   const row = getDb()
     .prepare('SELECT 1 AS x FROM pending_channel_approvals WHERE messaging_group_id = ?')
-    .get(messagingGroupId) as { x: number } | undefined;
+    .get(messagingGroupId) as { x: number } | undefined ?? undefined;
   return row !== undefined;
 }
 

@@ -59,7 +59,7 @@ export function getDestinations(agentGroupId: string): AgentDestination[] {
 export function getDestinationByName(agentGroupId: string, localName: string): AgentDestination | undefined {
   return getDb()
     .prepare('SELECT * FROM agent_destinations WHERE agent_group_id = ? AND local_name = ?')
-    .get(agentGroupId, localName) as AgentDestination | undefined;
+    .get(agentGroupId, localName) as AgentDestination | undefined ?? undefined;
 }
 
 /** Reverse lookup: what does this agent call the given target? */
@@ -70,7 +70,7 @@ export function getDestinationByTarget(
 ): AgentDestination | undefined {
   return getDb()
     .prepare('SELECT * FROM agent_destinations WHERE agent_group_id = ? AND target_type = ? AND target_id = ?')
-    .get(agentGroupId, targetType, targetId) as AgentDestination | undefined;
+    .get(agentGroupId, targetType, targetId) as AgentDestination | undefined ?? undefined;
 }
 
 /** Permission check: can this agent send to this target? */

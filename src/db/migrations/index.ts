@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type { Database } from 'bun:sqlite';
 
 import { log } from '../../log.js';
 import { migration001 } from './001-initial.js';
@@ -17,7 +17,7 @@ import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js
 export interface Migration {
   version: number;
   name: string;
-  up: (db: Database.Database) => void;
+  up: (db: Database) => void;
 }
 
 const migrations: Migration[] = [
@@ -35,7 +35,7 @@ const migrations: Migration[] = [
   migration014,
 ];
 
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(db: Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,

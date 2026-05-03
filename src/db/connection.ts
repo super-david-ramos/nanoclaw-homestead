@@ -1,29 +1,29 @@
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import fs from 'fs';
 import path from 'path';
 
 import { log } from '../log.js';
 
-let _db: Database.Database | null = null;
+let _db: Database | null = null;
 
-export function getDb(): Database.Database {
+export function getDb(): Database {
   if (!_db) throw new Error('Database not initialized. Call initDb() first.');
   return _db;
 }
 
-export function initDb(dbPath: string): Database.Database {
+export function initDb(dbPath: string): Database {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  _db = new Database(dbPath);
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('foreign_keys = ON');
+  _db = new Database(dbPath, { strict: true });
+  _db.run('PRAGMA journal_mode = WAL');
+  _db.run('PRAGMA foreign_keys = ON');
   log.info('Central DB initialized', { path: dbPath });
   return _db;
 }
 
 /** For tests only — creates an in-memory DB and runs migrations. */
-export function initTestDb(): Database.Database {
-  _db = new Database(':memory:');
-  _db.pragma('foreign_keys = ON');
+export function initTestDb(): Database {
+  _db = new Database(':memory:', { strict: true });
+  _db.run('PRAGMA foreign_keys = ON');
   return _db;
 }
 
@@ -40,9 +40,9 @@ export function closeDb(): void {
  * table at runtime (next service start), and callers may run before
  * or after that boundary.
  */
-export function hasTable(db: Database.Database, name: string): boolean {
+export function hasTable(db: Database, name: string): boolean {
   const row = db.prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1`).get(name) as
     | { '1': number }
-    | undefined;
+    | undefined ?? undefined;
   return row !== undefined;
 }

@@ -7,7 +7,7 @@
  *   - Tracks delivery in inbound.db's `delivered` table (host-owned)
  *   - Never writes to outbound.db — preserves single-writer-per-file invariant
  */
-import type Database from 'better-sqlite3';
+import type { Database } from 'bun:sqlite';
 
 import { getRunningSessions, getActiveSessions, createPendingQuestion } from './db/sessions.js';
 import { getAgentGroup } from './db/agent-groups.js';
@@ -166,8 +166,8 @@ async function drainSession(session: Session): Promise<void> {
   const agentGroup = getAgentGroup(session.agent_group_id);
   if (!agentGroup) return;
 
-  let outDb: Database.Database;
-  let inDb: Database.Database;
+  let outDb: Database;
+  let inDb: Database;
   try {
     outDb = openOutboundDb(agentGroup.id, session.id);
     inDb = openInboundDb(agentGroup.id, session.id);
@@ -242,7 +242,7 @@ async function deliverMessage(
     content: string;
   },
   session: Session,
-  inDb: Database.Database,
+  inDb: Database,
 ): Promise<string | undefined> {
   if (!deliveryAdapter) {
     log.warn('No delivery adapter configured, dropping message', { id: msg.id });
@@ -397,7 +397,7 @@ async function deliverMessage(
 async function maybeAttachVoiceReply(
   msg: { id: string; kind: string },
   content: Record<string, unknown>,
-  inDb: Database.Database,
+  inDb: Database,
 ): Promise<OutboundFile | null> {
   try {
     if (msg.kind !== 'chat') return null;
@@ -406,7 +406,7 @@ async function maybeAttachVoiceReply(
 
     const row = inDb.prepare('SELECT content FROM messages_in WHERE trigger = 1 ORDER BY seq DESC LIMIT 1').get() as
       | { content: string }
-      | undefined;
+      | undefined ?? undefined;
     if (!row) return null;
 
     let parsed: Record<string, unknown>;
@@ -441,7 +441,7 @@ async function maybeAttachVoiceReply(
 export type DeliveryActionHandler = (
   content: Record<string, unknown>,
   session: Session,
-  inDb: Database.Database,
+  inDb: Database,
 ) => Promise<void>;
 
 const actionHandlers = new Map<string, DeliveryActionHandler>();
@@ -461,7 +461,7 @@ export function registerDeliveryAction(action: string, handler: DeliveryActionHa
 async function handleSystemAction(
   content: Record<string, unknown>,
   session: Session,
-  inDb: Database.Database,
+  inDb: Database,
 ): Promise<void> {
   const action = content.action as string;
   log.info('System action from agent', { sessionId: session.id, action });
