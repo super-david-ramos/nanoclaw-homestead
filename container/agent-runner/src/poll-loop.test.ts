@@ -313,7 +313,9 @@ describe('processFollowUpMessages', () => {
     // The script's data must reach the agent — that's the whole point of
     // the gate. Without this assertion, regression #1 could re-appear in a
     // different shape (script ran but output got stripped before push).
-    expect(query.pushed[0]).toContain('"diff":"x"');
+    // Formatter pretty-prints scriptOutput, so the spacing in the rendered
+    // JSON depends on JSON.stringify(..., null, 2) — match flexibly.
+    expect(query.pushed[0]).toMatch(/"diff"\s*:\s*"x"/);
     expect(getPendingMessages()).toHaveLength(0);
   });
 

@@ -208,6 +208,53 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
 }
 
 /**
+ * Active-query follow-up gate. Mirrors the initial-batch path:
+ * filter system + clear-commands (handled elsewhere), apply pre-task
+ * scripts, push only the surviving messages.
+ *
+ * Without the script gate (the original bug), every recurrence tick of an
+ * fs-watcher-style task got pushed as a raw follow-up, the agent saw a
+ * prompt with no scriptOutput, replied "no script output data — staying
+ * silent", and the cycle repeated until the host killed the container.
+ *
+ * Exported for direct testing (poll-loop.test.ts). Production callers go
+ * through processQuery → setInterval, which guards against re-entrancy via
+ * an `inFlight` flag because this function is now genuinely async.
+ */
+export async function processFollowUpMessages(
+  query: AgentQuery,
+  logFn: (msg: string) => void,
+): Promise<void> {
+  // Skip system messages (MCP tool responses — handled via the SDK's own
+  // channel, not messages_in) and /clear (top-level poll-loop owns
+  // continuation reset). These rows STAY pending; the gate doesn't touch
+  // them.
+  const newMessages = getPendingMessages().filter((m) => {
+    if (m.kind === 'system') return false;
+    if ((m.kind === 'chat' || m.kind === 'chat-sdk') && isClearCommand(m)) return false;
+    return true;
+  });
+  if (newMessages.length === 0) return;
+
+  const newIds = newMessages.map((m) => m.id);
+  markProcessing(newIds);
+
+  const { applyPreTaskScripts } = await import('./scheduling/task-script.js');
+  const { keep, skipped } = await applyPreTaskScripts(newMessages);
+  if (skipped.length > 0) {
+    markCompleted(skipped);
+    logFn(`Pre-task script skipped ${skipped.length} follow-up task(s): ${skipped.join(', ')}`);
+  }
+
+  if (keep.length === 0) return;
+
+  const prompt = formatMessages(keep);
+  logFn(`Pushing ${keep.length} follow-up message(s) into active query`);
+  query.push(prompt);
+  markCompleted(keep.map((m) => m.id));
+}
+
+/**
  * Format messages, handling passthrough commands differently.
  * When the provider handles slash commands natively (Claude Code),
  * passthrough commands are sent raw (no XML wrapping) so the SDK can
@@ -260,31 +307,17 @@ async function processQuery(
   // Stream liveness is decided host-side via the heartbeat file + processing
   // claim age (see src/host-sweep.ts); if something is truly stuck, the host
   // will kill the container and messages get reset to pending.
+  // Concurrent: one in-flight push at a time so a slow script can't trigger
+  // overlapping setInterval callbacks (the previous version did
+  // markProcessing → push → markCompleted synchronously, but adding the script
+  // gate makes the body genuinely async).
+  let inFlight = false;
   const pollHandle = setInterval(() => {
-    if (done) return;
-
-    // Skip system messages (MCP tool responses) and /clear (needs fresh query).
-    // Thread routing is the router's concern — if a message landed in this
-    // session, the agent should see it. Per-thread sessions already isolate
-    // threads into separate containers; shared sessions intentionally merge
-    // everything. Filtering on thread_id here caused deadlocks when the
-    // initial batch and follow-ups had mismatched thread_ids (e.g. a
-    // host-generated welcome trigger with null thread vs a Discord DM reply).
-    const newMessages = getPendingMessages().filter((m) => {
-      if (m.kind === 'system') return false;
-      if ((m.kind === 'chat' || m.kind === 'chat-sdk') && isClearCommand(m)) return false;
-      return true;
+    if (done || inFlight) return;
+    inFlight = true;
+    void processFollowUpMessages(query, log).finally(() => {
+      inFlight = false;
     });
-    if (newMessages.length > 0) {
-      const newIds = newMessages.map((m) => m.id);
-      markProcessing(newIds);
-
-      const prompt = formatMessages(newMessages);
-      log(`Pushing ${newMessages.length} follow-up message(s) into active query`);
-      query.push(prompt);
-
-      markCompleted(newIds);
-    }
   }, ACTIVE_POLL_INTERVAL_MS);
 
   try {
