@@ -4,8 +4,8 @@
 # Rendered into the SKILL.md prompt via `!bash setup/probe.sh` so Claude sees
 # the current system state before generating its first response.
 #
-# Pure bash by design: this runs BEFORE setup.sh has installed Node, pnpm, and
-# node_modules, so it cannot rely on any Node-based tooling. Every field below
+# Pure bash by design: this runs BEFORE setup.sh has installed Bun and
+# node_modules, so it cannot rely on any Bun-based tooling. Every field below
 # is computed from POSIX utilities + grep/awk/curl.
 #
 # This is a routing aid, NOT a replacement for per-step idempotency checks.
@@ -76,10 +76,11 @@ probe_os() {
 
 probe_host_deps() {
   local node_modules="$PROJECT_ROOT/node_modules"
-  local native="$node_modules/better-sqlite3/build/Release/better_sqlite3.node"
-  # `better-sqlite3`'s compiled native binding is the canonical proof that
-  # `pnpm install` ran AND the native build step succeeded.
-  if [[ -d "$node_modules" && -f "$native" ]]; then
+  # Under bun there is no native compile step (bun:sqlite is built-in), so the
+  # canonical proof of a finished `bun install --frozen-lockfile` is the
+  # populated `.bin/` shim directory. Plain `[[ -d node_modules ]]` is too
+  # weak — a partial/aborted install can leave the directory empty.
+  if [[ -d "$node_modules/.bin" ]]; then
     echo "ok"
   else
     echo "missing"
