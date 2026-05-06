@@ -15,6 +15,7 @@ Phases are sequential but tasks within a phase can parallelize where dependencie
 | 2 | Proactive household value — morning briefing, fs-watcher equivalent | [phases/phase-2-proactive.md](phases/phase-2-proactive.md) |
 | 3 | Owen + safety — child role, content filter, OPA reintroduction | [phases/phase-3-owen-safety.md](phases/phase-3-owen-safety.md) |
 | Bun migration | Host runtime: Node + pnpm → Bun. Unifies host and container on one runtime. | [phases/phase-bun-migration.md](phases/phase-bun-migration.md) |
+| Installer rewrite for Bun | Make `bash nanoclaw.sh` work for fresh-machine deployments under Bun (the bun-migration phase only fixed the already-set-up host). | [phases/phase-installer-bun.md](phases/phase-installer-bun.md) |
 
 ## Out of scope for v0 (with reintroduction conditions)
 
