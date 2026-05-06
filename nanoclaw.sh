@@ -3,10 +3,10 @@
 # NanoClaw — end-to-end setup entry point.
 #
 # Runs two parts from the user's perspective as one continuous flow:
-#   - bash-side: install the basics (Node + pnpm + native modules) under a
+#   - bash-side: install the basics (Bun + dependencies) under a
 #     bash-rendered clack-alike spinner. Can't use setup/auto.ts here since
-#     tsx isn't available until pnpm install completes.
-#   - hand off to `pnpm run setup:auto`, which renders the rest with
+#     bun isn't available until install-bun.sh completes.
+#   - hand off to `bun run setup:auto`, which renders the rest with
 #     @clack/prompts. The wordmark is printed once here so setup:auto can
 #     skip it and the flow reads as a single sequence.
 #
@@ -67,21 +67,17 @@ write_bootstrap_entry() {
   local status=$1 dur=$2 raw=$3
   local ts
   ts=$(ts_utc)
-  local platform is_wsl node_version deps_ok native_ok has_build_tools
+  local platform is_wsl bun_version deps_ok
   platform=$(grep_field PLATFORM "$raw")
   is_wsl=$(grep_field IS_WSL "$raw")
-  node_version=$(grep_field NODE_VERSION "$raw" | head -1)
+  bun_version=$(grep_field BUN_VERSION "$raw" | head -1)
   deps_ok=$(grep_field DEPS_OK "$raw")
-  native_ok=$(grep_field NATIVE_OK "$raw")
-  has_build_tools=$(grep_field HAS_BUILD_TOOLS "$raw")
   {
     echo "=== [${ts}] bootstrap [${dur}s] → ${status} ==="
     [ -n "$platform" ]        && echo "  platform: ${platform}"
     [ -n "$is_wsl" ]          && echo "  is_wsl: ${is_wsl}"
-    [ -n "$node_version" ]    && echo "  node_version: ${node_version}"
+    [ -n "$bun_version" ]     && echo "  bun_version: ${bun_version}"
     [ -n "$deps_ok" ]         && echo "  deps_ok: ${deps_ok}"
-    [ -n "$native_ok" ]       && echo "  native_ok: ${native_ok}"
-    [ -n "$has_build_tools" ] && echo "  has_build_tools: ${has_build_tools}"
     # Emit the raw path relative to PROJECT_ROOT so the progression log
      # is portable and matches the TS-side format (logs/setup-steps/NN-…).
     echo "  raw: ${raw#${PROJECT_ROOT}/}"
@@ -135,14 +131,14 @@ printf '\n  %s%s\n' "$(bold 'Nano')" "$(brand_bold 'Claw')"
 printf '  %s\n\n' "$(dim 'Setting up your personal AI assistant')"
 
 # ─── pre-flight: Homebrew on macOS ─────────────────────────────────────
-# setup/install-node.sh and setup/install-docker.sh both require `brew` on
+# setup/install-bun.sh and setup/install-docker.sh both require `brew` on
 # macOS. On a factory Mac there's no brew, and those helpers would fail
 # later inside the bootstrap spinner with a cryptic error. Prompt here,
 # before the spinner starts, so the user knows what's about to happen and
 # brew's own interactive sudo/CLT prompts stay readable.
 if [ "$(uname -s)" = "Darwin" ] && ! command -v brew >/dev/null 2>&1; then
   printf '  %s\n' \
-    "$(dim "Homebrew isn't installed. NanoClaw uses it to install Node and Docker on your Mac.")"
+    "$(dim "Homebrew isn't installed. NanoClaw uses it to install Bun and Docker on your Mac.")"
   printf '  %s\n\n' \
     "$(dim "This also installs Apple's Command Line Tools, which can take 5-10 minutes.")"
   read -r -p "  $(bold 'Install Homebrew now?') [Y/n] " BREW_ANS </dev/tty
@@ -182,7 +178,7 @@ if [ "$(uname -s)" = "Darwin" ] && ! command -v brew >/dev/null 2>&1; then
   esac
 fi
 
-# ─── first step: install the basics (Node + pnpm + native modules) ─────
+# ─── first step: install the basics (Bun + dependencies) ─────────────
 
 BOOTSTRAP_RAW="${STEPS_DIR}/01-bootstrap.log"
 BOOTSTRAP_LABEL="Installing the basics"
@@ -245,18 +241,15 @@ fi
 # wipe it.
 export NANOCLAW_BOOTSTRAPPED=1
 
-# setup.sh may have just installed pnpm via npm into a prefix that's not on
-# our PATH (custom `npm config set prefix`, or the default prefix missing
-# from the shell's login PATH). Its PATH mutation doesn't propagate back
-# to us — so replay the same lookup here before the exec.
-if ! command -v pnpm >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-  NPM_PREFIX="$(npm config get prefix 2>/dev/null)"
-  if [ -n "$NPM_PREFIX" ] && [ -x "$NPM_PREFIX/bin/pnpm" ]; then
-    export PATH="$NPM_PREFIX/bin:$PATH"
-  fi
+# setup.sh may have just installed bun via the Linux curl-installer, which
+# drops the binary at ~/.bun/bin/bun and writes a shell-profile export the
+# current process won't see. macOS brew installs land on the standard PATH
+# (/opt/homebrew/bin or /usr/local/bin) so this is mainly the Linux path.
+if ! command -v bun >/dev/null 2>&1 && [ -x "$HOME/.bun/bin/bun" ]; then
+  export PATH="$HOME/.bun/bin:$PATH"
 fi
 
-# --silent suppresses pnpm's `> nanoclaw@2.0.0 setup:auto / > tsx setup/auto.ts`
-# preamble so the flow continues visually from "Basics installed" straight
-# into setup:auto's spinner. exec so signals (Ctrl-C) propagate directly.
-exec pnpm --silent run setup:auto
+# --silent suppresses bun's `$ bun run setup/auto.ts` preamble so the flow
+# continues visually from "Basics installed" straight into setup:auto's
+# spinner. exec so signals (Ctrl-C) propagate directly.
+exec bun run --silent setup:auto
