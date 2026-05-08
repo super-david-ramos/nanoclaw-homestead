@@ -287,6 +287,19 @@ When picking up work in this repo:
 
 Upstream wins. Surface the conflict in the completion report's "Manual validation" section so the user can decide whether to update upstream or update the fork's convention. Never silently override.
 
+## Response style — caveman ultra (default in this repo)
+
+Default response level for this repo is **caveman ultra**. On every session, switch to ultra (e.g. invoke `/caveman ultra` or the equivalent skill) and stay there for all human-facing replies. Drop articles, filler, and pleasantries. Abbreviate prose words (DB, auth, config, req, res, fn, impl). Use arrows for causality (`X → Y`). Strip conjunctions when fragment order is unambiguous. **Never abbreviate** code symbols, function names, API names, file paths, or quoted error strings.
+
+Exemptions where prose is required (auto-clarity from caveman SKILL):
+- Security warnings and irreversible-action confirmations
+- Multi-step sequences where fragment order risks misread
+- Compression that creates technical ambiguity
+- User asks to clarify or repeats question
+- Code blocks, commit messages, PR bodies, completion reports
+
+Resume ultra after the prose-required part ends. Off only on `stop caveman` or `normal mode`.
+
 ## When the user authorizes long autonomous work
 
 Phrases like "autopilot", "max effort", "work until I interrupt", "I'll be out, keep going" → invoke `/autopilot` first. The skill at `.claude/skills/autopilot/SKILL.md` codifies the working pattern that's safe under those constraints (TDD discipline + advisor checkpoints + scratch-before-live + commit-log-as-narrative + no pushes). Don't reinvent it each session.
