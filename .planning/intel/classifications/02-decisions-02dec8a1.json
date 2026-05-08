@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/02-decisions.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Decisions index — six load-bearing choices",
+  "summary": "Index page linking to six ADR-style decision deep-dives that govern the homestead fork of nanoclaw v2.",
+  "scope": [
+    "skill resolution",
+    "OPA policy",
+    "voice I/O",
+    "pool substitution / Max OAuth runtime",
+    "self-improving skills",
+    "Obsidian markdown memory"
+  ],
+  "cross_refs": [
+    "decisions/01-skill-resolution.md",
+    "decisions/02-policy-opa.md",
+    "decisions/03-voice.md",
+    "decisions/04-no-pool-no-max.md",
+    "decisions/05-self-improving.md",
+    "decisions/06-obsidian-markdown.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Index/aggregator doc, not itself an ADR. References six ADR deep-dives under decisions/. No Status/Decision/Consequences sections, no acceptance markers — content is navigation + rationale prose. The referenced decisions/0X-*.md files are the actual ADRs and should be classified individually."
+}

@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/decisions/06-obsidian-markdown.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Decision 6 — Obsidian-compatible markdown for the memory surface",
+  "summary": "Decision to keep nanoclaw's per-group markdown folders as the Obsidian vault directly, using PARA layout and plain GFM with no sync layer.",
+  "scope": [
+    "groups/<folder>/",
+    "memory surface",
+    "Obsidian vault",
+    "PARA folders (projects, areas, resources, archive, conversations)",
+    "GFM markdown",
+    "wikilinks",
+    "global/CLAUDE.md"
+  ],
+  "cross_refs": [
+    "groups/main/CLAUDE.md",
+    "groups/<group-folder>/",
+    "groups/family/",
+    "global/CLAUDE.md",
+    "CLAUDE.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Filename convention (numbered decision under decisions/) and content (single decision + 'What this decision does NOT include' scope-limit) match ADR pattern. No explicit `Status:` field, so locked=false per rule (only Accepted counts as locked)."
+}

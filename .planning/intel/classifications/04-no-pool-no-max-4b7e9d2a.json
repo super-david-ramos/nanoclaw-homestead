@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/decisions/04-no-pool-no-max.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Decision 4 — no pool-aware substitution, no Claude Code CLI / Max OAuth",
+  "summary": "Decision to skip homestead-ts ADR-0011 pool-snapshot substitution and ADR-0014 pluggable Claude Code CLI runtime; v0 uses nanoclaw's default Claude Agent SDK + OneCLI vault path.",
+  "scope": [
+    "model-routing strategy",
+    "Claude Agent SDK runtime",
+    "OneCLI Agent Vault credential injection",
+    "provider abstraction (src/providers/)",
+    "OpenCode / Ollama / OpenRouter via skills",
+    "Max-subscription billing path",
+    "pool-snapshot ingestion",
+    "substitution router"
+  ],
+  "cross_refs": [
+    "homestead-ts ADR-0011",
+    "homestead-ts ADR-0014",
+    "/add-opencode",
+    "/add-ollama-provider"
+  ],
+  "locked": true,
+  "precedence": null,
+  "notes": "No explicit Status: Accepted frontmatter, but document is in decisions/ directory with definitive 'will NOT build' and 'when to revisit' sections; project CLAUDE.md treats decisions/ as load-bearing decision records. Treated as locked Accepted ADR."
+}

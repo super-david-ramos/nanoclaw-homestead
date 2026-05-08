@@ -1,0 +1,21 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/05-phases.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Phased build order",
+  "summary": "Index of sequential build phases for the nanoclaw-homestead milestone, with out-of-scope capabilities and per-phase working pattern.",
+  "scope": ["build phases", "phase index", "out-of-scope capabilities", "working pattern", "household agent milestone"],
+  "cross_refs": [
+    "phases/phase-0-foundations.md",
+    "phases/phase-1-voice.md",
+    "phases/phase-2-proactive.md",
+    "phases/phase-3-owen-safety.md",
+    "phases/phase-bun-migration.md",
+    "phases/phase-installer-bun.md",
+    "conventions.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

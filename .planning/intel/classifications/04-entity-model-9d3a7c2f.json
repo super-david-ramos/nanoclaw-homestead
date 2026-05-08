@@ -1,0 +1,13 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/04-entity-model.md",
+  "type": "DOC",
+  "confidence": "medium",
+  "manifest_override": false,
+  "title": "Household entity model on nanoclaw",
+  "summary": "Provisional mapping of household members and groups (David, Partner, Owen, guests) onto nanoclaw's users, user_roles, agent_groups, and messaging_groups tables.",
+  "scope": ["users table", "user_roles table", "agent_groups", "messaging_groups", "household entity model", "family agent group", "kids agent group", "guest agent group"],
+  "cross_refs": ["docs/isolation-model.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": "Self-described as 'Initial proposal' with Status: Provisional. No ADR decision/consequences structure, no PRD user stories, no SPEC schema/contract — reads as planning-context prose explaining intended use of an existing schema. Classified DOC; medium confidence because it sits adjacent to spec territory (table mappings) but explicitly defers binding wiring to /setup."
+}

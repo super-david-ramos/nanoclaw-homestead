@@ -1,0 +1,32 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/phases/phase-installer-bun.md",
+  "type": "SPEC",
+  "confidence": "medium",
+  "manifest_override": false,
+  "title": "Phase: Installer rewrite for Bun",
+  "summary": "Phase plan to rewrite the nanoclaw fresh-machine installer chain (nanoclaw.sh, setup.sh, probe.sh, TS runners, channel installers) from Node+pnpm to Bun.",
+  "scope": [
+    "nanoclaw.sh bootstrap script",
+    "setup.sh runtime detection and install",
+    "setup/install-bun.sh (new)",
+    "setup/install-node.sh (removal)",
+    "setup/probe.sh",
+    "setup/auto.ts",
+    "setup/lib/runner.ts",
+    "setup/lib/agent-ping.ts",
+    "setup/install-<channel>.sh family",
+    "package.json packageManager field",
+    "tests/demo/installer-bun/ smoke demo",
+    "Bun runtime install path (macOS brew + Linux curl)",
+    "BUN_VERSION / DEPS_OK status fields",
+    "bun install --frozen-lockfile contract"
+  ],
+  "cross_refs": [
+    "phase-bun-migration.md",
+    "../conventions.md",
+    "follow-ups.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Phase planning doc under docs/plan/phases/. Mixes SPEC traits (API delta table, file inventory, exit codes, test gates, implementation contracts per task) with DOC traits (rationale prose, risk/rollback). Classified SPEC because the dominant content is implementation contracts (per-file changes, status field schemas, exit codes, demo gates) the system must honor. Not ADR (no Decision/Consequences structure, no Status: Accepted). Not PRD (no user stories or acceptance criteria from user perspective)."
+}

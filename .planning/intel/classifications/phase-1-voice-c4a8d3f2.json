@@ -1,0 +1,24 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/phases/phase-1-voice.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Phase 1 — voice everywhere",
+  "summary": "Phase plan for adding inbound STT and outbound TTS across text channels, with task breakdown, demo, and completion reports.",
+  "scope": ["voice", "STT", "TTS", "Whisper", "Kokoro", "Telegram", "chat-sdk-bridge", "delivery", "users.prefers_voice_replies"],
+  "cross_refs": [
+    "../decisions/03-voice.md",
+    "../conventions.md",
+    "tests/demo/phase-1/voice-roundtrip/",
+    "src/voice/stt.ts",
+    "src/voice/transcript-attach.ts",
+    "src/voice/tts.ts",
+    "src/voice/voice-reply.ts",
+    "src/delivery.ts",
+    "src/channels/chat-sdk-bridge.ts",
+    "docs/plan/follow-ups.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

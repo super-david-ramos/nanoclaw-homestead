@@ -1,0 +1,16 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/06-open-questions.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Open questions",
+  "summary": "Tracks unresolved design questions for the homestead extension plan, with resolution links folded back into decision docs once answered.",
+  "scope": ["planning", "design questions", "voice", "iMessage", "webhook channel", "guest expiry", "inbound.db routing"],
+  "cross_refs": [
+    "decisions/01-skill-resolution.md",
+    "decisions/03-voice.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

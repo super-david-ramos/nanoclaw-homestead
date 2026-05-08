@@ -1,0 +1,23 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/decisions/05-self-improving.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Decision 5 — self-improving skills via propose-and-confirm (informed by Hermes)",
+  "summary": "Decision to stay on nanoclaw and port Hermes's self-improving-skill capability via a propose-and-confirm container skill with approval gate and three-tier writes.",
+  "scope": [
+    "self-improving skills",
+    "auto-skill-save container skill",
+    "Hermes substrate evaluation",
+    "approval gate",
+    "role-based skill resolution",
+    "Phase 0 defaults"
+  ],
+  "cross_refs": [
+    "01-skill-resolution.md",
+    "container/skills/auto-skill-save/SKILL.md"
+  ],
+  "locked": true,
+  "precedence": null,
+  "notes": ""
+}

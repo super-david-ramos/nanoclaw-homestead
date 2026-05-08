@@ -1,0 +1,26 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/conventions.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Working conventions",
+  "summary": "Project-specific working norms covering TDD red/green discipline, integration test preference, demo-script layout, and completion-report templates.",
+  "scope": [
+    "TDD workflow",
+    "test layout (host Vitest, container bun:test, skills Vitest)",
+    "integration tests across host/container DB boundary",
+    "demo scripts at task boundaries",
+    "completion-report template",
+    "upstream-conflict resolution"
+  ],
+  "cross_refs": [
+    "CLAUDE.md",
+    "docs/",
+    "tests/demo/<phase>/<feature>/",
+    "docs/plan/phases/<phase>/reports/<task>.md",
+    "vitest.skills.config.ts"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

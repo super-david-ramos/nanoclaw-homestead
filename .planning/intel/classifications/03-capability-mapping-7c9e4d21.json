@@ -1,0 +1,43 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/03-capability-mapping.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Capability mapping — homestead-ts → nanoclaw v2",
+  "summary": "Tabular mapping of homestead-ts capabilities to nanoclaw v2 mechanisms, noting ports, drops, and decision-doc references for each.",
+  "scope": [
+    "homestead-ts to nanoclaw v2 capability port",
+    "channel ingest (Telegram, iMessage, SMS, webhook)",
+    "voice in/out (STT/TTS)",
+    "skill resolution (user/role/shared)",
+    "orchestrator + queue",
+    "policy/OPA",
+    "scheduled tasks and host-sweep",
+    "watchdog/launchd",
+    "vault fs-watcher",
+    "memory (SQLite + markdown vault)",
+    "pool-aware substitution (dropped)",
+    "Claude Code CLI / Max OAuth (dropped)",
+    "persona vs infra naming",
+    "per-user briefings",
+    "content filters and time windows",
+    "external comms draft approvals",
+    "guest access",
+    "weekly review reports",
+    "activity replay",
+    "Telegram inline feedback",
+    "self-improving skills"
+  ],
+  "cross_refs": [
+    "decisions/03-voice.md",
+    "decisions/01-skill-resolution.md",
+    "decisions/02-policy-opa.md",
+    "decisions/06-obsidian-markdown.md",
+    "decisions/04-no-pool-no-max.md",
+    "decisions/05-self-improving.md",
+    "docs/architecture.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

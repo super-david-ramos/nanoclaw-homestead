@@ -1,0 +1,25 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/phases/phase-3-owen-safety.md",
+  "type": "DOC",
+  "confidence": "medium",
+  "manifest_override": false,
+  "title": "Phase 3 — Owen + safety",
+  "summary": "Phase plan and task breakdown for extending the household agent to a child role with content filter, time-window enforcement, and external-comms hard-deny.",
+  "scope": [
+    "child role enforcement",
+    "kids agent group",
+    "content filter",
+    "time-window enforcement",
+    "transcript review queue",
+    "OPA reintroduction gate",
+    "user_roles"
+  ],
+  "cross_refs": [
+    "../conventions.md",
+    "../decisions/02-policy-opa.md",
+    "docs/plan/decisions/07-opa-reintroduction.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Phase planning document with task list (T-3.1–T-3.5), TDD pairs, demo path, and completion criteria. No frontmatter, no ADR Decision/Consequences structure, no user-story PRD form, no API/schema SPEC tables — closest fit is DOC (project planning/roadmap). Contains implicit requirements (child role hard-denies, time windows, audit) that synthesizer may want to surface despite DOC tag."
+}

@@ -1,0 +1,25 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/README.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "nanoclaw-homestead — plan & working norms",
+  "summary": "Index README for the plan directory; lists reading order and points to conventions, decisions, phases, and reference docs.",
+  "scope": ["plan navigation", "working pattern", "nanoclaw-homestead fork", "household agent"],
+  "cross_refs": [
+    "conventions.md",
+    "01-mental-model.md",
+    "02-decisions.md",
+    "decisions/",
+    "05-phases.md",
+    "phases/",
+    "03-capability-mapping.md",
+    "04-entity-model.md",
+    "06-open-questions.md",
+    "follow-ups.md",
+    "phases/phase-0-foundations.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

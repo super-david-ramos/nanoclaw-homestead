@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/decisions/02-policy-opa.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Decision 2 — drop OPA for v0; bring back only for high-stakes flows",
+  "summary": "Defers OPA/Rego policy engine for v0, leaning on nanoclaw's existing user_roles, OneCLI secret modes, pending_approvals, and unknown_sender_policy primitives until specific reintroduction triggers fire.",
+  "scope": [
+    "OPA",
+    "Rego policy bundles",
+    "user_roles",
+    "OneCLI secret modes",
+    "pending_approvals",
+    "unknown_sender_policy",
+    "MCP tool gate",
+    "Owen role",
+    "external comms (email/SMS, Resend, Gmail)",
+    "destructive actions",
+    "guest access"
+  ],
+  "cross_refs": [
+    "src/command-gate.ts"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Numbered decision record under /docs/plan/decisions/ with clear Decision/Rationale/Triggers structure — strong ADR signal. No explicit `Status: Accepted` frontmatter, so `locked` left false per spec; the doc is declarative and treated as in-effect for v0, but consumer should confirm lock state from the plan README if precedence matters."
+}

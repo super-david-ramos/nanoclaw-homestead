@@ -1,0 +1,36 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/01-mental-model.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Mental model: nanoclaw v2 invariants we inherit",
+  "summary": "Summarizes load-bearing nanoclaw v2 architectural invariants (host/container split, entity model, skills, channels, secrets, memory) that household-agent design must fit within.",
+  "scope": [
+    "nanoclaw v2 host",
+    "session containers",
+    "session DBs (inbound.db/outbound.db)",
+    "entity model (users, agent_groups, messaging_groups, sessions)",
+    "isolation modes",
+    "skill types",
+    "channels and providers branches",
+    "OneCLI Agent Vault secrets",
+    "markdown memory",
+    "self-modification"
+  ],
+  "cross_refs": [
+    "docs/SPEC.md",
+    "architecture.md",
+    "db.md",
+    "isolation-model.md",
+    "skills-as-branches.md",
+    "CLAUDE.md",
+    "docs/isolation-model.md",
+    "docs/skills-as-branches.md",
+    "CONTRIBUTING.md",
+    "https://agentskills.io",
+    "06-open-questions.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

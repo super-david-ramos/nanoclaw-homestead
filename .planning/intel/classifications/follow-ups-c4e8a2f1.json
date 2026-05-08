@@ -1,0 +1,13 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/follow-ups.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Follow-ups",
+  "summary": "Deferred-work tracker for the homestead plan: open follow-up items with origin dates and notes, plus a session resume pointer.",
+  "scope": ["deferred work tracking", "resume pointer", "nanoclaw.sh installer rewrite", "translated READMEs", "writeOutboundDirect rename", "delivery.ts coverage", "host-sweep.ts coverage", "router.ts coverage", "Telegram voice-note UI", "users.prefers_voice_replies column", "fs-watcher per-file-hash state", "agent-runner pre-existing test failures", "Phase 2 demo respawn flag"],
+  "cross_refs": ["phases/phase-bun-migration.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

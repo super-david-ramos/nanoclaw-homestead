@@ -1,0 +1,26 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/phases/phase-0-foundations.md",
+  "type": "PRD",
+  "confidence": "medium",
+  "manifest_override": false,
+  "title": "Phase 0 — minimal viable household",
+  "summary": "Phase-0 plan: wire one Telegram channel, ship multi-tier skill resolution conventions, and render household memory in Obsidian.",
+  "scope": [
+    "Telegram channel install",
+    "role-resolver skill",
+    "auto-skill-save skill",
+    "family agent group bootstrap",
+    "PARA folder layout under groups/family/",
+    "Obsidian vault unification (iCloud)",
+    "Phase-0 wrap demo"
+  ],
+  "cross_refs": [
+    "../conventions.md",
+    "../decisions/01-skill-resolution.md",
+    "../decisions/05-self-improving.md",
+    "../../../tests/demo/phase-0/family-roundtrip/expected.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Phase doc — hybrid of goals + acceptance criteria (PRD-shaped) and TDD task tracking with embedded completion reports. Not a classic user-story PRD but the closest taxonomy fit: each task has scope, 'Done when' acceptance criteria, and manual-validation steps. No single architectural decision (not ADR), no API/schema contracts (not SPEC), and richer than narrative DOC."
+}

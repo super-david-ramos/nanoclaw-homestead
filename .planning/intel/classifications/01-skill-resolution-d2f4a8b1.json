@@ -1,0 +1,25 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/decisions/01-skill-resolution.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Decision 1 — user > role > shared skill resolution as a container-skill convention",
+  "summary": "Adopts homestead-ts user>role>shared full-shadowing skill resolution on nanoclaw v2 via a single container convention skill plus a three-directory layout per agent group.",
+  "scope": [
+    "container skills",
+    "skill resolution",
+    "role-resolver SKILL.md",
+    "agent group skills layout",
+    "session-manager sender/role projection",
+    "inbound.db message envelope"
+  ],
+  "cross_refs": [
+    "../06-open-questions.md",
+    "CONTRIBUTING.md",
+    "src/session-manager.ts",
+    "container/skills/role-resolver/SKILL.md"
+  ],
+  "locked": true,
+  "precedence": null,
+  "notes": ""
+}

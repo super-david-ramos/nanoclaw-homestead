@@ -1,0 +1,31 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/phases/phase-2-proactive.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Phase 2 — proactive household value",
+  "summary": "Phase plan for proactive agent behaviors — morning briefing schedule_task and vault fs-watcher — with task breakdown, demo, and completion report.",
+  "scope": ["morning-briefing", "fs-watcher", "schedule_task", "vault-hash", "Obsidian", "iCloud-mount", "recurrence", "weekly-review", "family-agent-group", "container-mount-allowlist"],
+  "cross_refs": [
+    "../conventions.md",
+    "src/modules/scheduling/morning-briefing.ts",
+    "scripts/init-morning-briefing.ts",
+    "src/modules/scheduling/fs-watcher.ts",
+    "scripts/init-fs-watcher.ts",
+    "container/agent-runner/src/scripts/vault-hash.ts",
+    "groups/family/container.json",
+    "groups/main/CLAUDE.md",
+    "src/modules/scheduling/morning-briefing.test.ts",
+    "src/modules/scheduling/fs-watcher.test.ts",
+    "container/agent-runner/src/scripts/vault-hash.test.ts",
+    "src/modules/scheduling/recurrence.test.ts",
+    "tests/demo/phase-2/proactive/",
+    "tests/demo/phase-2/proactive/run.sh",
+    "tests/demo/phase-2/proactive/README.md",
+    "tests/demo/phase-2/proactive/expected.md",
+    "docs/plan/follow-ups.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

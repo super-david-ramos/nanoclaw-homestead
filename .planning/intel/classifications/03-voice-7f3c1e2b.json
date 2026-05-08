@@ -1,0 +1,13 @@
+{
+  "source_path": "/Users/dr/Code/nanoclaw-homestead/docs/plan/decisions/03-voice.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "Decision 3 — voice (Whisper/Kokoro) wraps every text channel",
+  "summary": "Locks voice as channel-I/O wrapping (STT inbound, TTS outbound) with host-side shell-out execution of whisper-cli/Kokoro and a per-user prefers_voice_replies SQL flag.",
+  "scope": ["voice I/O", "STT (Whisper)", "TTS (Kokoro)", "channel adapters", "Telegram voice messages", "delivery layer", "users table", "prefers_voice_replies column", "skill/voice-transcription", "skill/local-whisper", "skill/voice-in", "skill/voice-out", "host process execution model", "data/models/ggml-base.bin"],
+  "cross_refs": ["docs/architecture.md", "../06-open-questions.md", "../phases/phase-1-voice.md"],
+  "locked": true,
+  "precedence": null,
+  "notes": ""
+}
