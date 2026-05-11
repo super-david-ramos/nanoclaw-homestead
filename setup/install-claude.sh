@@ -7,7 +7,7 @@
 #
 # The native installer is Node-independent (downloads a prebuilt binary to
 # ~/.local/bin) and is the path Anthropic documents. This matches the
-# pattern used by install-docker.sh / install-node.sh: the script itself is
+# pattern used by install-docker.sh / install-bun.sh: the script itself is
 # the allowlisted unit; the curl | bash pipe lives inside it.
 
 set -euo pipefail

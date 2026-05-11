@@ -40,7 +40,7 @@ export interface AssistContext {
  * they appear in fail() calls; values are repo-relative paths.
  */
 const STEP_FILES: Record<string, string[]> = {
-  bootstrap: ['setup.sh', 'setup/install-node.sh', 'nanoclaw.sh'],
+  bootstrap: ['setup.sh', 'setup/install-bun.sh', 'nanoclaw.sh'],
   environment: ['setup/environment.ts'],
   container: [
     'setup/container.ts',
