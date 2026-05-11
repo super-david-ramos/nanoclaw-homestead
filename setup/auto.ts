@@ -1,5 +1,5 @@
 /**
- * Non-interactive setup driver — the step sequencer for `pnpm run setup:auto`.
+ * Non-interactive setup driver — the step sequencer for `bun run setup:auto`.
  *
  * Responsibility: orchestrate the sequence of steps end-to-end and route
  * between them. The runner, spawning, status parsing, spinner, abort, and
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
       await fail(
         'cli-agent',
         "Couldn't bring your assistant online.",
-        `You can retry later with \`pnpm exec tsx scripts/init-cli-agent.ts --display-name "${displayName!}" --agent-name "${CLI_AGENT_NAME}"\`.`,
+        `You can retry later with \`bun run scripts/init-cli-agent.ts --display-name "${displayName!}" --agent-name "${CLI_AGENT_NAME}"\`.`,
       );
     }
     if (!skip.has('first-chat')) {
@@ -365,7 +365,7 @@ async function main(): Promise<void> {
         if (agentPing && agentPing !== 'ok' && agentPing !== 'skipped') {
           notes.push(
             "• Your assistant didn't reply to a test message. " +
-              'Check `logs/nanoclaw.log` for clues, then try `pnpm run chat hi`.',
+              'Check `logs/nanoclaw.log` for clues, then try `bun run chat hi`.',
           );
         }
       }
@@ -399,7 +399,7 @@ async function main(): Promise<void> {
   }
 
   const rows: [string, string][] = [
-    ['Chat in the terminal:', 'pnpm run chat hi'],
+    ['Chat in the terminal:', 'bun run chat hi'],
     ["See what's happening:", 'tail -f logs/nanoclaw.log'],
     ['Open Claude Code:', 'claude'],
   ];
@@ -434,7 +434,7 @@ async function main(): Promise<void> {
     );
     p.outro(k.green("You're set."));
   } else {
-    p.outro(k.green("You're ready! Chat with `pnpm run chat hi`."));
+    p.outro(k.green("You're ready! Chat with `bun run chat hi`."));
   }
 }
 
@@ -504,7 +504,7 @@ function renderPingFailureNote(result: PingResult): void {
     result === 'socket_error'
       ? [
           wrapForGutter(
-            "The NanoClaw service isn't listening on its local socket. Try restarting it, then chat with `pnpm run chat hi`:",
+            "The NanoClaw service isn't listening on its local socket. Try restarting it, then chat with `bun run chat hi`:",
             6,
           ),
           '',
@@ -512,14 +512,14 @@ function renderPingFailureNote(result: PingResult): void {
           `  Linux:  systemctl --user restart ${getSystemdUnit()}`,
         ].join('\n')
       : wrapForGutter(
-          'No reply from your assistant within 30 seconds. Check `logs/nanoclaw.log` for clues, then try `pnpm run chat hi`.',
+          'No reply from your assistant within 30 seconds. Check `logs/nanoclaw.log` for clues, then try `bun run chat hi`.',
           6,
         );
   p.note(body, 'Skipping the first chat');
 }
 
 /**
- * Chat loop. Each message is piped through `pnpm run chat`, which uses
+ * Chat loop. Each message is piped through `bun run chat`, which uses
  * the same Unix-socket path the ping just exercised, so output streams
  * back inline as the agent replies. An empty input ends the loop.
  *
@@ -563,13 +563,13 @@ async function runFirstChat(): Promise<void> {
 
 function sendChatMessage(message: string): Promise<void> {
   return new Promise((resolve) => {
-    // `pnpm --silent` suppresses the `> nanoclaw@… chat` preamble so the
+    // `bun run --silent` suppresses the `> nanoclaw@… chat` preamble so the
     // agent's reply reads as a clean block under the prompt. Splitting on
-    // whitespace mirrors `pnpm run chat hello world` — chat.ts joins argv
+    // whitespace mirrors `bun run chat hello world` — chat.ts joins argv
     // with spaces on the far side.
     const child = spawn(
-      'pnpm',
-      ['--silent', 'run', 'chat', ...message.split(/\s+/)],
+      'bun',
+      ['run', '--silent', 'chat', ...message.split(/\s+/)],
       { stdio: ['ignore', 'inherit', 'inherit'] },
     );
     child.on('close', () => resolve());
@@ -945,7 +945,7 @@ function maybeReexecUnderSg(): void {
   if (spawnSync('which', ['sg'], { stdio: 'ignore' }).status !== 0) return;
 
   p.log.warn('Docker socket not accessible in current group. Re-executing under `sg docker`.');
-  const res = spawnSync('sg', ['docker', '-c', 'pnpm run setup:auto'], {
+  const res = spawnSync('sg', ['docker', '-c', 'bun run setup:auto'], {
     stdio: 'inherit',
     env: { ...process.env, NANOCLAW_REEXEC_SG: '1' },
   });
@@ -974,7 +974,7 @@ function printIntro(): void {
 
 /**
  * Bootstrap (nanoclaw.sh) normally initializes logs/setup.log and writes
- * the bootstrap entry before we even boot. If someone runs `pnpm run
+ * the bootstrap entry before we even boot. If someone runs `bun run
  * setup:auto` directly, start a fresh progression log here so we don't
  * append to a stale one from a previous run.
  */

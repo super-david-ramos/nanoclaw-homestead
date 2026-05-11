@@ -117,10 +117,10 @@ export function spawnStep(
   onLine?: (line: string) => void,
 ): Promise<StepResult> {
   return new Promise((resolve) => {
-    const args = ['exec', 'tsx', 'setup/index.ts', '--step', stepName];
+    const args = ['run', 'setup/index.ts', '--step', stepName];
     if (extra.length > 0) args.push('--', ...extra);
 
-    const child = spawn('pnpm', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('bun', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     const stream = new StatusStream(onBlock);
     const raw = fs.createWriteStream(rawLogPath, { flags: 'w' });
     raw.write(`# ${stepName} — ${new Date().toISOString()}\n\n`);
@@ -391,7 +391,7 @@ export async function fail(
         ...new Set([...existingSkip, ...setupLog.completedStepNames()]),
       ].join(',');
       p.log.step(`Retrying from ${stepName}…`);
-      const result = spawnSync('pnpm', ['--silent', 'run', 'setup:auto'], {
+      const result = spawnSync('bun', ['run', '--silent', 'setup:auto'], {
         stdio: 'inherit',
         env: { ...process.env, NANOCLAW_SKIP: skipList },
       });
