@@ -36,11 +36,8 @@ if ! grep -q "import './resend.js';" src/channels/index.ts; then
   printf "import './resend.js';\n" >> src/channels/index.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install @resend/chat-sdk-adapter@0.1.1
-
-echo "STEP: pnpm-build"
-pnpm run build
+echo "STEP: bun-install"
+bun add @resend/chat-sdk-adapter@0.1.1
 
 echo "STATUS: installed"
 echo "=== END ==="

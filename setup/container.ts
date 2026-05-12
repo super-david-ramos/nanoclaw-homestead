@@ -135,7 +135,7 @@ export async function run(args: string[]): Promise<void> {
       log.info('Re-executing container step under `sg docker`');
       const res = spawnSync(
         'sg',
-        ['docker', '-c', 'pnpm exec tsx setup/index.ts --step container'],
+        ['docker', '-c', 'bun run setup/index.ts --step container'],
         { cwd: projectRoot, stdio: 'inherit' },
       );
       process.exit(res.status ?? 1);

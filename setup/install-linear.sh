@@ -85,11 +85,8 @@ if ! grep -q 'if (config.catchAll) {' src/channels/chat-sdk-bridge.ts; then
     && mv src/channels/chat-sdk-bridge.ts.tmp src/channels/chat-sdk-bridge.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install @chat-adapter/linear@4.26.0
-
-echo "STEP: pnpm-build"
-pnpm run build
+echo "STEP: bun-install"
+bun add @chat-adapter/linear@4.26.0
 
 echo "STATUS: installed"
 echo "=== END ==="

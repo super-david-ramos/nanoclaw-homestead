@@ -55,13 +55,13 @@ export async function run(args: string[]): Promise<void> {
   const projectRoot = process.cwd();
   const script = path.join(projectRoot, 'scripts', 'init-cli-agent.ts');
 
-  const scriptArgs = ['exec', 'tsx', script, '--display-name', displayName];
+  const scriptArgs = ['run', script, '--display-name', displayName];
   if (agentName) scriptArgs.push('--agent-name', agentName);
 
   log.info('Invoking init-cli-agent', { displayName, agentName });
 
   try {
-    execFileSync('pnpm', scriptArgs, {
+    execFileSync('bun', scriptArgs, {
       cwd: projectRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf-8',

@@ -37,11 +37,8 @@ if ! grep -q "import './imessage.js';" src/channels/index.ts; then
   printf "import './imessage.js';\n" >> src/channels/index.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install chat-adapter-imessage@0.1.1
-
-echo "STEP: pnpm-build"
-pnpm run build
+echo "STEP: bun-install"
+bun add chat-adapter-imessage@0.1.1
 
 echo "STATUS: installed"
 echo "=== END ==="

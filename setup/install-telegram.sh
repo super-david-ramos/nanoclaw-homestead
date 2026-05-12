@@ -62,11 +62,8 @@ if ! grep -q "'pair-telegram':" setup/index.ts; then
   ' setup/index.ts > setup/index.ts.tmp && mv setup/index.ts.tmp setup/index.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install @chat-adapter/telegram@4.26.0
-
-echo "STEP: pnpm-build"
-pnpm run build
+echo "STEP: bun-install"
+bun add @chat-adapter/telegram@4.26.0
 
 echo "STATUS: installed"
 echo "=== END ==="

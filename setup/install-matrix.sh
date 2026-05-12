@@ -7,7 +7,7 @@
 # self-registration import; installs the pinned @beeper/chat-adapter-matrix
 # package; patches the adapter's published dist so its matrix-js-sdk/lib
 # imports carry .js extensions (required under Node 22 strict ESM); builds.
-# All steps are safe to re-run — re-run this script after any pnpm install
+# All steps are safe to re-run — re-run this script after any bun install
 # that touches the adapter.
 set -euo pipefail
 
@@ -39,24 +39,19 @@ if ! grep -q "import './matrix.js';" src/channels/index.ts; then
   printf "import './matrix.js';\n" >> src/channels/index.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install @beeper/chat-adapter-matrix@0.2.0
+echo "STEP: bun-install"
+bun add @beeper/chat-adapter-matrix@0.2.0
 
 echo "STEP: patch-esm-extensions"
-node -e '
-  const fs = require("fs"), path = require("path");
-  const root = "node_modules/.pnpm";
-  const dir = fs.readdirSync(root).find(d => d.startsWith("@beeper+chat-adapter-matrix@"));
-  if (!dir) { console.log("Matrix adapter not installed"); process.exit(0); }
-  const f = path.join(root, dir, "node_modules/@beeper/chat-adapter-matrix/dist/index.js");
+bun -e '
+  const fs = require("fs");
+  const f = "node_modules/@beeper/chat-adapter-matrix/dist/index.js";
+  if (!fs.existsSync(f)) { console.log("Matrix adapter not installed"); process.exit(0); }
   fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(
     /from "(matrix-js-sdk\/lib\/[^"]+?)(?<!\.js)"/g, "from \"$1.js\""
   ));
   console.log("Patched", f);
 '
-
-echo "STEP: pnpm-build"
-pnpm run build
 
 echo "STATUS: installed"
 echo "=== END ==="

@@ -94,19 +94,13 @@ if need_install; then
   '
 
   log "Installing Baileys + QR + pino (pinned)…"
-  pnpm install \
+  bun add \
     "${BAILEYS_VERSION}" \
     "${QRCODE_VERSION}" \
     "${QRCODE_TYPES_VERSION}" \
     "${PINO_VERSION}" \
     >&2 2>/dev/null || {
-    emit_status failed "pnpm install failed"
-    exit 1
-  }
-
-  log "Building…"
-  pnpm run build >&2 2>/dev/null || {
-    emit_status failed "pnpm run build failed"
+    emit_status failed "bun add failed"
     exit 1
   }
 else

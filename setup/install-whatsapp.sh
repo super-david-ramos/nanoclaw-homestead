@@ -65,11 +65,8 @@ if ! grep -q "'whatsapp-auth':" setup/index.ts; then
   ' setup/index.ts > setup/index.ts.tmp && mv setup/index.ts.tmp setup/index.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install @whiskeysockets/baileys@6.17.16 qrcode@1.5.4 @types/qrcode@1.5.6 pino@9.6.0
-
-echo "STEP: pnpm-build"
-pnpm run build
+echo "STEP: bun-install"
+bun add @whiskeysockets/baileys@6.17.16 qrcode@1.5.4 @types/qrcode@1.5.6 pino@9.6.0
 
 echo "STATUS: installed"
 echo "=== END ==="

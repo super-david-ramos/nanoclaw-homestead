@@ -77,19 +77,13 @@ fi
 
 # qrcode is needed by setup/signal-auth.ts to render the linking URL as a
 # terminal QR. Install idempotently — if it's already present (e.g. from a
-# prior WhatsApp install) pnpm is a no-op.
-if ! node -e "require.resolve('qrcode')" >/dev/null 2>&1; then
+# prior WhatsApp install) bun add is a no-op.
+if ! bun -e "import('qrcode')" >/dev/null 2>&1; then
   log "Installing ${QRCODE_VERSION}…"
-  pnpm install "${QRCODE_VERSION}" "${QRCODE_TYPES_VERSION}" >&2 2>/dev/null || {
-    emit_status failed "pnpm install ${QRCODE_VERSION} failed"
+  bun add "${QRCODE_VERSION}" "${QRCODE_TYPES_VERSION}" >&2 2>/dev/null || {
+    emit_status failed "bun add ${QRCODE_VERSION} failed"
     exit 1
   }
 fi
-
-log "Building…"
-pnpm run build >&2 2>/dev/null || {
-  emit_status failed "pnpm run build failed"
-  exit 1
-}
 
 emit_status success

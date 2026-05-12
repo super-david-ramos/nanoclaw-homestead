@@ -36,11 +36,8 @@ if ! grep -q "import './whatsapp-cloud.js';" src/channels/index.ts; then
   printf "import './whatsapp-cloud.js';\n" >> src/channels/index.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install @chat-adapter/whatsapp@4.26.0
-
-echo "STEP: pnpm-build"
-pnpm run build
+echo "STEP: bun-install"
+bun add @chat-adapter/whatsapp@4.26.0
 
 echo "STATUS: installed"
 echo "=== END ==="

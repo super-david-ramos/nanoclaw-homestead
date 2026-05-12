@@ -81,14 +81,8 @@ if need_install; then
   fi
 
   log "Installing ${ADAPTER_VERSION}…"
-  pnpm install "${ADAPTER_VERSION}" >&2 2>/dev/null || {
-    emit_status failed "pnpm install ${ADAPTER_VERSION} failed"
-    exit 1
-  }
-
-  log "Building…"
-  pnpm run build >&2 2>/dev/null || {
-    emit_status failed "pnpm run build failed"
+  bun add "${ADAPTER_VERSION}" >&2 2>/dev/null || {
+    emit_status failed "bun add ${ADAPTER_VERSION} failed"
     exit 1
   }
 else

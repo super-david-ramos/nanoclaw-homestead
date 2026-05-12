@@ -3,7 +3,7 @@
  * data/env/env (the container-mounted copy).
  *
  * Usage:
- *   pnpm exec tsx setup/index.ts --step set-env -- \
+ *   bun run setup/index.ts --step set-env -- \
  *     --key TELEGRAM_BOT_TOKEN --value "<token>" [--sync-container]
  *
  * Exists so channel-install flows don't have to invent grep/sed/rm pipelines

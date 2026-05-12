@@ -1,6 +1,6 @@
 /**
  * Setup CLI entry point.
- * Usage: pnpm exec tsx setup/index.ts --step <name> [args...]
+ * Usage: bun run setup/index.ts --step <name> [args...]
  */
 import { log } from '../src/log.js';
 import { emitStatus } from './status.js';
@@ -32,7 +32,7 @@ async function main(): Promise<void> {
 
   if (stepIdx === -1 || !args[stepIdx + 1]) {
     console.error(
-      `Usage: pnpm exec tsx setup/index.ts --step <${Object.keys(STEPS).join('|')}> [args...]`,
+      `Usage: bun run setup/index.ts --step <${Object.keys(STEPS).join('|')}> [args...]`,
     );
     process.exit(1);
   }

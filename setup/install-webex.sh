@@ -36,11 +36,8 @@ if ! grep -q "import './webex.js';" src/channels/index.ts; then
   printf "import './webex.js';\n" >> src/channels/index.ts
 fi
 
-echo "STEP: pnpm-install"
-pnpm install @bitbasti/chat-adapter-webex@0.1.0
-
-echo "STEP: pnpm-build"
-pnpm run build
+echo "STEP: bun-install"
+bun add @bitbasti/chat-adapter-webex@0.1.0
 
 echo "STATUS: installed"
 echo "=== END ==="
