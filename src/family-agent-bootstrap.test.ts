@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { closeDb, initTestDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';

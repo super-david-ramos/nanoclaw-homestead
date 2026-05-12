@@ -3,7 +3,7 @@
  * half of what used to live in src/access.ts. Moved here in PR #7 alongside
  * the approvals re-tier.
  */
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it } from 'bun:test';
 
 import type { ChannelAdapter, OutboundMessage } from '../../channels/adapter.js';
 import {

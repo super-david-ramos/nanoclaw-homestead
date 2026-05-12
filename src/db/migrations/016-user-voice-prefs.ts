@@ -10,8 +10,8 @@
 import type { Database } from 'bun:sqlite';
 import type { Migration } from './index.js';
 
-export const migration014: Migration = {
-  version: 14,
+export const migration016: Migration = {
+  version: 16,
   name: 'user-voice-prefs',
   up(db: Database) {
     db.exec(`ALTER TABLE users ADD COLUMN prefers_voice_replies INTEGER NOT NULL DEFAULT 0`);

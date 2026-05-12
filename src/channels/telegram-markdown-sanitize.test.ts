@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { sanitizeTelegramLegacyMarkdown } from './telegram-markdown-sanitize.js';
 
 describe('sanitizeTelegramLegacyMarkdown', () => {

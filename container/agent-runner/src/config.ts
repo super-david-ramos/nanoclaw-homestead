@@ -26,6 +26,7 @@ export interface RunnerConfig {
    * deterministic for sandbox round trips), production stays Sonnet.
    */
   model?: string;
+  effort?: string;
 }
 
 const DEFAULT_MAX_MESSAGES = 10;
@@ -47,6 +48,7 @@ export function parseConfig(raw: Record<string, unknown>): RunnerConfig {
       typeof raw.maxMessagesPerPrompt === 'number' ? raw.maxMessagesPerPrompt : DEFAULT_MAX_MESSAGES,
     mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
     model: typeof raw.model === 'string' && raw.model.length > 0 ? raw.model : undefined,
+    effort: typeof raw.effort === 'string' && raw.effort.length > 0 ? raw.effort : undefined,
   };
 }
 

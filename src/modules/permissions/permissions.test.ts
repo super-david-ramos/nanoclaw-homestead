@@ -3,7 +3,7 @@
  * ensureUserDm. Moved here from src/access.test.ts in PR #7 alongside the
  * approvals re-tier that deleted src/access.ts.
  */
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it } from 'bun:test';
 
 import type { ChannelAdapter, OutboundMessage } from '../../channels/adapter.js';
 import {

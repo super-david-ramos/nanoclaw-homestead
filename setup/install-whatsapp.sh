@@ -66,7 +66,7 @@ if ! grep -q "'whatsapp-auth':" setup/index.ts; then
 fi
 
 echo "STEP: bun-install"
-bun add @whiskeysockets/baileys@6.17.16 qrcode@1.5.4 @types/qrcode@1.5.6 pino@9.6.0
+bun add @whiskeysockets/baileys@7.0.0-rc.9 qrcode@1.5.4 @types/qrcode@1.5.6 pino@9.6.0
 
 echo "STATUS: installed"
 echo "=== END ==="

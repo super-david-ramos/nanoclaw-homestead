@@ -10,7 +10,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'bun:test';
 
 import { ensureSchema, openInboundDb } from '../../db/session-db.js';
 import { scheduleFsWatcher, FS_WATCHER_SERIES_ID, DEFAULT_FS_WATCHER_SCRIPT } from './fs-watcher.js';

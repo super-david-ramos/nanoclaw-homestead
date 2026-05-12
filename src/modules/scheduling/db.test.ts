@@ -6,7 +6,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'bun:test';
 
 import { ensureSchema, openInboundDb } from '../../db/session-db.js';
 import {
