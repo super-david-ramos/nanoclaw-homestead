@@ -55,10 +55,7 @@ function installInstantTimers(): { calls: SetTimeoutCall[]; restore: () => void 
   const original = global.setTimeout;
   // The cast is necessary because Node's setTimeout type returns Timeout, but we
   // only need the Promise callers to resolve.
-  (global as unknown as { setTimeout: typeof setTimeout }).setTimeout = ((
-    cb: () => void,
-    delay?: number,
-  ) => {
+  (global as unknown as { setTimeout: typeof setTimeout }).setTimeout = ((cb: () => void, delay?: number) => {
     calls.push({ delay: delay ?? 0 });
     return original(cb, 0);
   }) as typeof setTimeout;
